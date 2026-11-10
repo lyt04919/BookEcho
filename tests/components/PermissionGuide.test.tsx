@@ -15,23 +15,27 @@ describe('PermissionGuide Component', () => {
     expect(html).toContain('~/Library/Containers/com.apple.iBooksX');
   });
 
-  it('should render both action buttons with correct labels', () => {
+  it('should render all action buttons with correct labels', () => {
     const html = renderToStaticMarkup(<PermissionGuide {...defaultProps} />);
     expect(html).toContain('手动选择 iBooks 目录或备份');
+    expect(html).toContain('打开系统隐私设置');
     expect(html).toContain('重新检测系统权限');
   });
 
   it('should render action buttons that trigger callbacks', () => {
     const onSelectDir = vi.fn();
     const onRetry = vi.fn();
-    const element = <PermissionGuide onSelectDir={onSelectDir} onRetry={onRetry} />;
+    const onOpenPrivacy = vi.fn();
+    const element = <PermissionGuide onSelectDir={onSelectDir} onRetry={onRetry} onOpenPrivacy={onOpenPrivacy} />;
     
     // Simulate click via props directly on elements
     element.props.onSelectDir();
     element.props.onRetry();
+    element.props.onOpenPrivacy();
 
     expect(onSelectDir).toHaveBeenCalledTimes(1);
     expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onOpenPrivacy).toHaveBeenCalledTimes(1);
   });
 
   it('should support dark mode styling tokens', () => {

@@ -181,11 +181,26 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('system:openAppleBooks', async (_, _assetId: string, epubPath?: string | null) => {
-    if (epubPath && fs.existsSync(epubPath)) {
-      await shell.openPath(epubPath);
-      return true;
+    if (epubPath && typeof epubPath === 'string' && fs.existsSync(epubPath)) {
+      const lower = epubPath.toLowerCase();
+      const isValidExtension = lower.endsWith('.epub') || lower.endsWith('.ibooks');
+      const isInBooksFolder =
+        epubPath.includes('/Containers/com.apple.BKAgentService/') ||
+        epubPath.includes('/Containers/com.apple.iBooksX/') ||
+        epubPath.includes('/Library/Books/') ||
+        epubPath.includes('/Books/');
+
+      if (isValidExtension || isInBooksFolder) {
+        await shell.openPath(epubPath);
+        return true;
+      }
     }
     await shell.openExternal('ibooks://');
+    return true;
+  });
+
+  ipcMain.handle('system:openSystemPrivacy', async () => {
+    await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
     return true;
   });
 

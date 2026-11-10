@@ -292,7 +292,14 @@ export default function App() {
               {searchResults.map(res => (
                 <div
                   key={res.uuid}
-                  className="p-4 rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card shadow-sm"
+                  onClick={() => {
+                    const matchedBook = books.find(b => b.assetId === res.assetId);
+                    if (matchedBook) {
+                      handleSelectBook(matchedBook);
+                    }
+                    setCurrentTab('books');
+                  }}
+                  className="p-4 rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card shadow-sm cursor-pointer hover:border-paper-terracotta/60 dark:hover:border-night-terracotta/60 hover:shadow-md transition-all"
                 >
                   <p className="font-serif text-sm leading-relaxed mb-2 text-paper-text dark:text-night-text">
                     “{res.selectedText}”

@@ -23,6 +23,7 @@ const api: BookEchoAPI = {
     ipcRenderer.invoke('semantics:update', colorKey, label),
   openInAppleBooks: (assetId: string, epubPath?: string | null) =>
     ipcRenderer.invoke('system:openAppleBooks', assetId, epubPath),
+  openSystemPrivacySettings: () => ipcRenderer.invoke('system:openSystemPrivacy'),
   selectCustomDataDir: () => ipcRenderer.invoke('system:selectCustomDir'),
   exportMarkdown: (assetId: string, format: 'standard' | 'obsidian') =>
     ipcRenderer.invoke('export:markdown', assetId, format)

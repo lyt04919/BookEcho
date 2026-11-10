@@ -92,7 +92,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
   const semantic = colorSemantics.find(s => s.colorKey === currentItem.colorKey);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-paper-bg dark:bg-night-bg">
+    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-paper-bg dark:bg-night-bg overflow-y-auto">
       {/* 进度计数器 */}
       <div className="w-full max-w-xl flex items-center justify-between text-xs text-paper-muted dark:text-night-muted mb-4">
         <span className="flex items-center gap-1 font-medium">
@@ -151,7 +151,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         {/* 快捷操作栏 */}
         <div className="flex items-center justify-between pt-6 border-t border-paper-border/60 dark:border-night-border/60">
           <span className="text-[11px] text-paper-muted dark:text-night-muted">
-            按 <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">空格</kbd> 下一条，<kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">Enter</kbd> 标为内化
+            按 <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">空格</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">→</kbd> 下一条，<kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">Enter</kbd> 标为内化
           </span>
 
           <div className="flex items-center gap-2">

@@ -18,6 +18,7 @@ describe('IPC API Contract Check', () => {
     'getColorSemantics',
     'updateColorSemantic',
     'openInAppleBooks',
+    'openSystemPrivacySettings',
     'selectCustomDataDir',
     'exportMarkdown'
   ];
@@ -36,13 +37,14 @@ describe('IPC API Contract Check', () => {
     'semantics:get',
     'semantics:update',
     'system:openAppleBooks',
+    'system:openSystemPrivacy',
     'system:selectCustomDir',
     'export:markdown'
   ];
 
   it('should define all required API methods on window.bookEchoAPI interface', () => {
     // 静态校验契约完备性
-    expect(EXPECTED_API_KEYS.length).toBe(15);
+    expect(EXPECTED_API_KEYS.length).toBe(16);
   });
 
   it('should have matching ipcRenderer invoke channels in preload.ts', () => {
@@ -70,8 +72,8 @@ describe('IPC API Contract Check', () => {
     const preloadChannels = Array.from(preloadContent.matchAll(/ipcRenderer\.invoke\(['"]([^'"]+)['"]/g)).map(m => m[1]);
     const mainChannels = Array.from(mainContent.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)).map(m => m[1]);
 
-    expect(preloadChannels.length).toBe(15);
-    expect(mainChannels.length).toBe(15);
+    expect(preloadChannels.length).toBe(16);
+    expect(mainChannels.length).toBe(16);
     expect(preloadChannels.sort()).toEqual(mainChannels.sort());
   });
 });

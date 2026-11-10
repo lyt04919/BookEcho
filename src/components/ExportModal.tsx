@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, FileText, CheckCircle2 } from 'lucide-react';
 
 export interface ExportModalProps {
@@ -10,6 +10,18 @@ export interface ExportModalProps {
 export const ExportModal: React.FC<ExportModalProps> = ({ bookTitle, onClose, onConfirmExport }) => {
   const [format, setFormat] = useState<'standard' | 'obsidian'>('obsidian');
   const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [onClose]);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -25,8 +37,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({ bookTitle, onClose, on
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       data-testid="export-modal"
+      onClick={onClose}
     >
-      <div className="bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-2xl w-full max-w-md p-6 shadow-xl space-y-6 text-paper-text dark:text-night-text">
+      <div
+        className="bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-2xl w-full max-w-md p-6 shadow-xl space-y-6 text-paper-text dark:text-night-text"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between pb-3 border-b border-paper-border dark:border-night-border">
           <h3 className="font-serif text-lg font-bold text-paper-text dark:text-night-text">导出 Markdown 笔记</h3>
           <button

@@ -218,19 +218,8 @@ export class UserVaultDb {
 
   public getReviewCandidates(allUuids: string[]): { uuid: string; score: number }[] {
     if (allUuids.length === 0) return [];
-    const placeholders = allUuids.map(() => '?').join(',');
-    const rows = this.db.prepare(`
-      SELECT annotation_uuid, is_starred, review_count, last_reviewed_at, review_status
-      FROM annotation_meta
-      WHERE annotation_uuid IN (${placeholders})
-    `).all(...allUuids) as {
-      annotation_uuid: string;
-      is_starred: number;
-      review_count: number;
-      last_reviewed_at: number | null;
-      review_status: string;
-    }[];
 
+    const CHUNK_SIZE = 500;
     const metaMap = new Map<string, {
       annotation_uuid: string;
       is_starred: number;
@@ -238,12 +227,28 @@ export class UserVaultDb {
       last_reviewed_at: number | null;
       review_status: string;
     }>();
-    rows.forEach(r => metaMap.set(r.annotation_uuid, r));
+
+    for (let i = 0; i < allUuids.length; i += CHUNK_SIZE) {
+      const chunk = allUuids.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => '?').join(',');
+      const rows = this.db.prepare(`
+        SELECT annotation_uuid, is_starred, review_count, last_reviewed_at, review_status
+        FROM annotation_meta
+        WHERE annotation_uuid IN (${placeholders})
+      `).all(...chunk) as {
+        annotation_uuid: string;
+        is_starred: number;
+        review_count: number;
+        last_reviewed_at: number | null;
+        review_status: string;
+      }[];
+      rows.forEach(r => metaMap.set(r.annotation_uuid, r));
+    }
 
     const now = Date.now();
     const scored = allUuids.map(uuid => {
       const meta = metaMap.get(uuid);
-      if (meta && meta.review_status === 'mastered') {
+      if (meta && (meta.review_status === 'mastered' || meta.review_status === 'archived')) {
         return { uuid, score: -9999 };
       }
 

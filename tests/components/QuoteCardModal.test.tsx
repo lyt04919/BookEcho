@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QuoteCardModal, QuoteCardModalProps, THEME_STYLES, CardTheme } from '../../src/components/QuoteCardModal';
 import { AnnotationItem } from '../../electron/types/ipc';
@@ -164,5 +165,71 @@ describe('QuoteCardModal Component', () => {
 
     props.onClose();
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('should support closing via backdrop click while stopping propagation on card', () => {
+    const onClose = vi.fn();
+    const props = createDefaultProps({ onClose });
+
+    const dispatcher = (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
+    const prevDispatcher = dispatcher.current;
+    dispatcher.current = {
+      useState: (init: any) => [init, vi.fn()],
+      useRef: () => ({ current: null }),
+      useEffect: () => {}
+    };
+
+    try {
+      const root = QuoteCardModal(props) as any;
+      expect(root.props.onClick).toBe(onClose);
+
+      const stopPropagation = vi.fn();
+      const card = root.props.children;
+      card.props.onClick({ stopPropagation });
+      expect(stopPropagation).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      dispatcher.current = prevDispatcher;
+    }
+  });
+
+  it('should register Escape key listener and close on Escape', () => {
+    const onClose = vi.fn();
+    let listener: ((e: any) => void) | null = null;
+    const originalWindow = (global as any).window;
+    (global as any).window = {
+      addEventListener: vi.fn((event: string, cb: any) => {
+        if (event === 'keydown') listener = cb;
+      }),
+      removeEventListener: vi.fn()
+    };
+
+    const dispatcher = (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
+    const prevDispatcher = dispatcher.current;
+    dispatcher.current = {
+      useState: (init: any) => [init, vi.fn()],
+      useRef: () => ({ current: null }),
+      useEffect: (cb: any) => {
+        cb();
+      }
+    };
+
+    try {
+      QuoteCardModal(createDefaultProps({ onClose }));
+      expect((global as any).window.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function));
+      if (listener) {
+        (listener as any)({ key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+        (listener as any)({ key: 'Enter' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      dispatcher.current = prevDispatcher;
+      if (originalWindow !== undefined) {
+        (global as any).window = originalWindow;
+      } else {
+        delete (global as any).window;
+      }
+    }
   });
 });

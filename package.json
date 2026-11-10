@@ -5,7 +5,9 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
+    "dev:electron": "vite",
     "build": "tsc && vite build",
+    "package": "electron-builder",
     "test": "vitest run",
     "test:watch": "vitest"
   },

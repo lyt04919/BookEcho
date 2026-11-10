@@ -82,14 +82,27 @@ describe('UserVaultDb & Secondary Annotations', () => {
     expect(queue[0].uuid).toBe('anno-starred');
   });
 
-  it('should lower score for mastered annotations in review candidates', () => {
+  it('should lower score for mastered and archived annotations in review candidates', () => {
     vault.recordReviewResult('anno-mastered', 'mastered');
+    vault.updateAnnotationMeta('anno-archived', { reviewStatus: 'archived' });
     vault.updateAnnotationMeta('anno-normal', {});
 
-    const candidates = vault.getReviewCandidates(['anno-mastered', 'anno-normal']);
+    const candidates = vault.getReviewCandidates(['anno-mastered', 'anno-archived', 'anno-normal']);
     expect(candidates[0].uuid).toBe('anno-normal');
     const mastered = candidates.find(c => c.uuid === 'anno-mastered');
     expect(mastered?.score).toBe(-9999);
+    const archived = candidates.find(c => c.uuid === 'anno-archived');
+    expect(archived?.score).toBe(-9999);
+  });
+
+  it('should handle large batches of UUIDs exceeding 500 items correctly', () => {
+    const largeUuids = Array.from({ length: 1050 }, (_, i) => `large-uuid-${i}`);
+    vault.updateAnnotationMeta('large-uuid-499', { isStarred: true });
+    vault.updateAnnotationMeta('large-uuid-501', { isStarred: true });
+
+    const candidates = vault.getReviewCandidates(largeUuids);
+    expect(candidates.length).toBe(1050);
+    expect(candidates[0].score).toBeGreaterThan(candidates[candidates.length - 1].score);
   });
 
   it('should manage app settings', () => {

@@ -79,6 +79,7 @@ export interface BookEchoAPI {
   getColorSemantics: () => Promise<ColorSemanticConfig[]>;
   updateColorSemantic: (colorKey: HighlightColor, label: string) => Promise<void>;
   openInAppleBooks: (assetId: string, epubPath?: string | null) => Promise<boolean>;
+  openSystemPrivacySettings: () => Promise<boolean>;
   selectCustomDataDir: () => Promise<string | null>;
   exportMarkdown: (assetId: string, format: 'standard' | 'obsidian') => Promise<{ success: boolean; filePath?: string }>;
 }

@@ -1,12 +1,21 @@
 import type { FC } from 'react';
-import { ShieldAlert, FolderOpen, RefreshCw } from 'lucide-react';
+import { ShieldAlert, FolderOpen, RefreshCw, ExternalLink } from 'lucide-react';
 
 export interface PermissionGuideProps {
   onSelectDir: () => void;
   onRetry: () => void;
+  onOpenPrivacy?: () => void;
 }
 
-export const PermissionGuide: FC<PermissionGuideProps> = ({ onSelectDir, onRetry }) => {
+export const PermissionGuide: FC<PermissionGuideProps> = ({ onSelectDir, onRetry, onOpenPrivacy }) => {
+  const handleOpenPrivacy = () => {
+    if (onOpenPrivacy) {
+      onOpenPrivacy();
+    } else if (typeof window !== 'undefined' && window.bookEchoAPI?.openSystemPrivacySettings) {
+      window.bookEchoAPI.openSystemPrivacySettings();
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 bg-paper-bg dark:bg-night-bg text-center">
       <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
@@ -24,6 +33,14 @@ export const PermissionGuide: FC<PermissionGuideProps> = ({ onSelectDir, onRetry
         >
           <FolderOpen className="w-4 h-4" />
           <span>手动选择 iBooks 目录或备份</span>
+        </button>
+
+        <button
+          onClick={handleOpenPrivacy}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-paper-border dark:border-night-border bg-white dark:bg-night-card text-sm font-medium text-paper-text dark:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          <span>打开系统隐私设置</span>
         </button>
 
         <button

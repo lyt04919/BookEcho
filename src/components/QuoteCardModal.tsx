@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { AnnotationItem } from '../../electron/types/ipc';
 import { toPng } from 'html-to-image';
 import { X, Copy, Check, Download } from 'lucide-react';
@@ -50,6 +50,18 @@ export const QuoteCardModal: React.FC<QuoteCardModalProps> = ({
   const [showNote, setShowNote] = useState(true);
   const [isCopied, setIsCopied] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [onClose]);
+
   const handleCopyImage = async () => {
     if (!cardRef.current) return;
     try {
@@ -85,8 +97,12 @@ export const QuoteCardModal: React.FC<QuoteCardModalProps> = ({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       data-testid="quote-card-modal"
+      onClick={onClose}
     >
-      <div className="bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-2xl w-full max-w-2xl p-6 shadow-xl space-y-6 text-paper-text dark:text-night-text">
+      <div
+        className="bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-2xl w-full max-w-2xl p-6 shadow-xl space-y-6 text-paper-text dark:text-night-text"
+        onClick={e => e.stopPropagation()}
+      >
         {/* 顶部标题与关闭 */}
         <div className="flex items-center justify-between pb-3 border-b border-paper-border dark:border-night-border">
           <h3 className="font-serif text-lg font-bold text-paper-text dark:text-night-text">金句卡片设计工坊</h3>

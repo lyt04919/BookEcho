@@ -136,6 +136,59 @@ describe('App State and Orchestration', () => {
     }
   });
 
+  it('should navigate to book detail when clicking search result card', () => {
+    const dispatcher = (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
+    const prevDispatcher = dispatcher.current;
+
+    let stateCallIndex = 0;
+    const setTabMock = vi.fn();
+    const setSelectedBookMock = vi.fn();
+
+    dispatcher.current = {
+      useState: (initial: any) => {
+        stateCallIndex++;
+        // Index 1 is currentTab
+        if (stateCallIndex === 1) {
+          return ['search', setTabMock];
+        }
+        // Index 2 is books
+        if (stateCallIndex === 2) {
+          return [mockBooks, vi.fn()];
+        }
+        // Index 3 is selectedBook
+        if (stateCallIndex === 3) {
+          return [null, setSelectedBookMock];
+        }
+        // Index 10 is searchKeyword
+        if (stateCallIndex === 10) {
+          return ['财富', vi.fn()];
+        }
+        // Index 11 is searchResults
+        if (stateCallIndex === 11) {
+          return [[mockAnnotation], vi.fn()];
+        }
+        return [initial, vi.fn()];
+      },
+      useEffect: () => {},
+      useRef: () => ({ current: null })
+    };
+
+    try {
+      const element = App() as ReactElement<any>;
+      const main = element.props.children[1];
+      const searchContainer = main.props.children;
+      const resultList = searchContainer.props.children[1];
+      const resultCard = resultList.props.children[0][0];
+
+      expect(resultCard.props.onClick).toBeDefined();
+      resultCard.props.onClick();
+      expect(setSelectedBookMock).toHaveBeenCalledWith(mockBooks[0]);
+      expect(setTabMock).toHaveBeenCalledWith('books');
+    } finally {
+      dispatcher.current = prevDispatcher;
+    }
+  });
+
   it('should render daily review view when currentTab is review', () => {
     const dispatcher = (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
     const prevDispatcher = dispatcher.current;

@@ -207,8 +207,14 @@ describe('DailyReviewView Component', () => {
       const props = createDefaultProps();
       const html = renderToStaticMarkup(<DailyReviewView {...props} />);
 
-      expect(html).toContain('按 <kbd class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">空格</kbd> 下一条');
+      expect(html).toContain('按 <kbd class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">空格</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">→</kbd> 下一条');
       expect(html).toContain('<kbd class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 dark:text-night-text font-mono">Enter</kbd> 标为内化');
+    });
+
+    it('should include overflow-y-auto on main container', () => {
+      const props = createDefaultProps();
+      const html = renderToStaticMarkup(<DailyReviewView {...props} />);
+      expect(html).toContain('overflow-y-auto');
     });
   });
 
