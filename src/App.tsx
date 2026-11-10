@@ -1,10 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { BookshelfView } from './components/BookshelfView';
-import { BookDetailView } from './components/BookDetailView';
-import { DailyReviewView } from './components/DailyReviewView';
-import { QuoteCardModal } from './components/QuoteCardModal';
-import { ExportModal } from './components/ExportModal';
 import {
   BookItem,
   AnnotationItem,
@@ -12,6 +6,14 @@ import {
   HighlightColor,
   HighlightContextResult
 } from '../electron/types/ipc';
+import { Sidebar } from './components/Sidebar';
+import { BookshelfView } from './components/BookshelfView';
+import { BookDetailView } from './components/BookDetailView';
+import { DailyReviewView } from './components/DailyReviewView';
+import { QuoteCardModal } from './components/QuoteCardModal';
+import { ExportModal } from './components/ExportModal';
+import { PermissionGuide } from './components/PermissionGuide';
+import { Search } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
@@ -24,156 +26,133 @@ const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'books' | 'review' | 'search'>('books');
-  const [colorSemantics, setColorSemantics] = useState<ColorSemanticConfig[]>(DEFAULT_SEMANTICS);
-  const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [books, setBooks] = useState<BookItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
-  const [bookAnnotations, setBookAnnotations] = useState<AnnotationItem[]>([]);
+  const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationItem[]>([]);
   const [reviewQueue, setReviewQueue] = useState<AnnotationItem[]>([]);
-  const [quoteModalAnnotation, setQuoteModalAnnotation] = useState<AnnotationItem | null>(null);
-  const [exportModalBook, setExportModalBook] = useState<BookItem | null>(null);
+  const [colorSemantics, setColorSemantics] = useState<ColorSemanticConfig[]>(DEFAULT_SEMANTICS);
+  const [tags, setTags] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<AnnotationItem[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [activeQuoteItem, setActiveQuoteItem] = useState<AnnotationItem | null>(null);
+  const [exportBookAssetId, setExportBookAssetId] = useState<string | null>(null);
+  const [hasPermissionError, setHasPermissionError] = useState(false);
+
+  // 初始化加载数据
+  const loadInitialData = async () => {
+    try {
+      if (typeof window !== 'undefined' && window.bookEchoAPI) {
+        const [fetchedBooks, semantics, fetchedTags] = await Promise.all([
+          window.bookEchoAPI.getBooks(),
+          window.bookEchoAPI.getColorSemantics(),
+          window.bookEchoAPI.getAllTags()
+        ]);
+        setBooks(fetchedBooks || []);
+        if (semantics && semantics.length > 0) {
+          setColorSemantics(semantics);
+        }
+        setTags(fetchedTags || []);
+        setHasPermissionError(false);
+      }
+    } catch (e) {
+      console.error('Failed to load initial Apple Books data', e);
+      setHasPermissionError(true);
+    }
+  };
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      window.bookEchoAPI.getColorSemantics().then(res => {
-        if (res && res.length > 0) setColorSemantics(res);
-      }).catch(err => {
-        console.warn('Failed to fetch color semantics', err);
-      });
-
-      window.bookEchoAPI.getAllTags().then(res => {
-        if (res) setTags(res);
-      }).catch(err => {
-        console.warn('Failed to fetch tags', err);
-      });
-
-      window.bookEchoAPI.getBooks().then(res => {
-        if (res) setBooks(res);
-      }).catch(err => {
-        console.warn('Failed to fetch books', err);
-      });
-    }
+    loadInitialData();
   }, []);
 
+  // 暗色模式样式同步
   useEffect(() => {
-    if (selectedBook && typeof window !== 'undefined' && window.bookEchoAPI) {
-      window.bookEchoAPI.getBookAnnotations(selectedBook.assetId).then(annos => {
-        setBookAnnotations(annos || []);
-      }).catch(err => {
-        console.warn('Failed to fetch annotations for book', err);
-      });
-    } else {
-      setBookAnnotations([]);
+    if (typeof document !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     }
-  }, [selectedBook]);
+  }, [isDarkMode]);
 
-  const fetchReviewQueue = async () => {
+  // 切换单书精读
+  const handleSelectBook = async (book: BookItem) => {
+    setSelectedBook(book);
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
-        const queue = await window.bookEchoAPI.getDailyReviewQueue();
-        setReviewQueue(queue || []);
+        const annos = await window.bookEchoAPI.getBookAnnotations(book.assetId);
+        setCurrentAnnotations(annos || []);
       } catch (err) {
-        console.warn('Failed to fetch daily review queue', err);
+        console.error('Failed to load book annotations', err);
+        setCurrentAnnotations([]);
+      }
+    } else {
+      setCurrentAnnotations([]);
+    }
+  };
+
+  // 加载每日回顾
+  const loadReviewQueue = async () => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        const q = await window.bookEchoAPI.getDailyReviewQueue(8);
+        setReviewQueue(q || []);
+      } catch (err) {
+        console.error('Failed to load daily review queue', err);
+        setReviewQueue([]);
       }
     }
   };
 
   useEffect(() => {
     if (currentTab === 'review') {
-      fetchReviewQueue();
+      loadReviewQueue();
     }
   }, [currentTab]);
 
-  const handleSubmitReviewResult = async (uuid: string, result: 'remembered' | 'mastered' | 'reset') => {
-    if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      try {
-        await window.bookEchoAPI.submitReviewResult(uuid, result);
-      } catch (err) {
-        console.error('Failed to submit review result', err);
-      }
-    }
-  };
-
-  const handleSelectTab = (tab: 'books' | 'review' | 'search') => {
-    setCurrentTab(tab);
-    if (tab === 'books') {
-      setSelectedColor(null);
-      setSelectedTag(null);
-      setSelectedBook(null);
-    }
-  };
-
-  const handleSelectCustomDir = async () => {
-    if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      try {
-        await window.bookEchoAPI.selectCustomDataDir();
-      } catch (err) {
-        console.error('Failed to select custom dir', err);
-      }
-    }
-  };
-
-  const handleToggleDarkMode = () => {
-    setIsDarkMode(prev => {
-      const next = !prev;
-      if (typeof document !== 'undefined') {
-        if (next) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
+  // 全局搜索触发（防抖 250ms）
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchKeyword.trim() && typeof window !== 'undefined' && window.bookEchoAPI) {
+        try {
+          const results = await window.bookEchoAPI.searchAnnotations(searchKeyword.trim());
+          setSearchResults(results || []);
+        } catch (err) {
+          console.error('Failed to search annotations', err);
+          setSearchResults([]);
         }
+      } else {
+        setSearchResults([]);
       }
-      return next;
-    });
-  };
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchKeyword]);
 
-  const handleOpenInAppleBooks = async (assetId: string, epubPath?: string | null) => {
-    if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      try {
-        await window.bookEchoAPI.openInAppleBooks(assetId, epubPath);
-      } catch (err) {
-        console.error('Failed to open in Apple Books', err);
-      }
-    }
-  };
-
-  const handleExportMarkdown = (assetId: string) => {
-    const book = books.find(b => b.assetId === assetId) || selectedBook;
-    if (book) {
-      setExportModalBook(book);
-    }
-  };
-
-  const handleConfirmExport = async (format: 'standard' | 'obsidian') => {
-    if (!exportModalBook) return;
-    if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      try {
-        await window.bookEchoAPI.exportMarkdown(exportModalBook.assetId, format);
-      } catch (err) {
-        console.error('Failed to export markdown', err);
-      }
-    }
-  };
-
+  // 更新星标
   const handleToggleStar = async (uuid: string) => {
-    const target = bookAnnotations.find(a => a.uuid === uuid);
-    if (!target) return;
-    const newStarred = !target.isStarred;
-    setBookAnnotations(prev => prev.map(a => a.uuid === uuid ? { ...a, isStarred: newStarred } : a));
+    const item = currentAnnotations.find(a => a.uuid === uuid);
+    if (!item) return;
+    const nextStarred = !item.isStarred;
+    setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
+    );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
-        await window.bookEchoAPI.updateAnnotationMeta(uuid, { isStarred: newStarred });
+        await window.bookEchoAPI.updateAnnotationMeta(uuid, { isStarred: nextStarred });
       } catch (err) {
         console.error('Failed to toggle star', err);
       }
     }
   };
 
+  // 更新延伸思考
   const handleUpdateCustomNote = async (uuid: string, note: string) => {
-    setBookAnnotations(prev => prev.map(a => a.uuid === uuid ? { ...a, customNote: note } : a));
+    setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
+    );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
         await window.bookEchoAPI.updateAnnotationMeta(uuid, { customNote: note });
@@ -183,20 +162,23 @@ export default function App() {
     }
   };
 
+  // 标签增删
   const handleAddTag = async (uuid: string, tag: string) => {
-    setBookAnnotations(prev => prev.map(a => {
-      if (a.uuid === uuid) {
-        const existingTags = a.tags || [];
-        if (!existingTags.includes(tag)) {
-          return { ...a, tags: [...existingTags, tag] };
+    setCurrentAnnotations(prev =>
+      prev.map(a => {
+        if (a.uuid === uuid) {
+          const prevTags = a.tags || [];
+          return prevTags.includes(tag) ? a : { ...a, tags: [...prevTags, tag] };
         }
-      }
-      return a;
-    }));
-    setTags(prev => prev.includes(tag) ? prev : [...prev, tag]);
+        return a;
+      })
+    );
+    setTags(prev => (prev.includes(tag) ? prev : [...prev, tag]));
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
         await window.bookEchoAPI.addTag(uuid, tag);
+        const updatedTags = await window.bookEchoAPI.getAllTags();
+        if (updatedTags) setTags(updatedTags);
       } catch (err) {
         console.error('Failed to add tag', err);
       }
@@ -204,50 +186,67 @@ export default function App() {
   };
 
   const handleRemoveTag = async (uuid: string, tag: string) => {
-    setBookAnnotations(prev => prev.map(a => {
-      if (a.uuid === uuid) {
-        return { ...a, tags: (a.tags || []).filter(t => t !== tag) };
-      }
-      return a;
-    }));
+    setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
+    );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
         await window.bookEchoAPI.removeTag(uuid, tag);
+        const updatedTags = await window.bookEchoAPI.getAllTags();
+        if (updatedTags) setTags(updatedTags);
       } catch (err) {
         console.error('Failed to remove tag', err);
       }
     }
   };
 
-  const handleRequestContext = async (annotation: AnnotationItem): Promise<HighlightContextResult> => {
+  // 选中图书或搜索结果请求上下文
+  const handleRequestContext = async (anno: AnnotationItem): Promise<HighlightContextResult> => {
+    const assetId = selectedBook?.assetId || anno.assetId;
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      return await window.bookEchoAPI.getHighlightContext(
-        annotation.assetId,
-        annotation.locationCfi || '',
-        annotation.selectedText
-      );
+      try {
+        return await window.bookEchoAPI.getHighlightContext(
+          assetId,
+          anno.locationCfi || '',
+          anno.selectedText
+        );
+      } catch (err) {
+        console.error('Failed to request context', err);
+      }
     }
     return {
       available: false,
       reason: 'NOT_FOUND',
       beforeParagraphs: [],
       currentParagraph: '',
-      selectedText: annotation.selectedText,
+      selectedText: anno.selectedText,
       afterParagraphs: []
     };
   };
 
-  const displayedAnnotations = bookAnnotations.filter(a => {
+  // 过滤后的高亮列表（按色彩与标签）
+  const filteredAnnotations = currentAnnotations.filter(a => {
     if (selectedColor && a.colorKey !== selectedColor) return false;
-    if (selectedTag && (!a.tags || !a.tags.includes(selectedTag))) return false;
+    if (selectedTag && !(a.tags || []).includes(selectedTag)) return false;
     return true;
   });
 
+  const exportingBook = exportBookAssetId
+    ? books.find(b => b.assetId === exportBookAssetId) || selectedBook
+    : null;
+
   return (
-    <div className={`flex h-screen w-screen overflow-hidden ${isDarkMode ? 'dark bg-night-bg text-night-text' : 'bg-paper-bg text-paper-text'}`}>
+    <div
+      className={`flex h-screen w-screen overflow-hidden ${
+        isDarkMode ? 'dark bg-night-bg text-night-text' : 'bg-paper-bg text-paper-text'
+      }`}
+    >
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={handleSelectTab}
+        onSelectTab={tab => {
+          setCurrentTab(tab);
+          setSelectedBook(null);
+        }}
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
         onSelectColor={setSelectedColor}
@@ -255,72 +254,125 @@ export default function App() {
         selectedTag={selectedTag}
         onSelectTag={setSelectedTag}
         isDarkMode={isDarkMode}
-        onToggleDarkMode={handleToggleDarkMode}
-        onSelectCustomDir={handleSelectCustomDir}
+        onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        onSelectCustomDir={async () => {
+          if (typeof window !== 'undefined' && window.bookEchoAPI) {
+            await window.bookEchoAPI.selectCustomDataDir();
+            loadInitialData();
+          }
+        }}
       />
-      {currentTab === 'books' && (
-        selectedBook ? (
+
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {hasPermissionError ? (
+          <PermissionGuide
+            onSelectDir={async () => {
+              if (typeof window !== 'undefined' && window.bookEchoAPI) {
+                await window.bookEchoAPI.selectCustomDataDir();
+                loadInitialData();
+              }
+            }}
+            onRetry={loadInitialData}
+          />
+        ) : currentTab === 'search' ? (
+          <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
+            <div className="relative mb-6 max-w-xl">
+              <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-paper-muted dark:text-night-muted" />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={e => setSearchKeyword(e.target.value)}
+                placeholder="搜索高亮句子、想法或批注..."
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text placeholder:text-paper-muted dark:placeholder:text-night-muted focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-4 max-w-3xl">
+              {searchResults.map(res => (
+                <div
+                  key={res.uuid}
+                  className="p-4 rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card shadow-sm"
+                >
+                  <p className="font-serif text-sm leading-relaxed mb-2 text-paper-text dark:text-night-text">
+                    “{res.selectedText}”
+                  </p>
+                  {res.note && (
+                    <p className="text-xs text-paper-muted dark:text-night-muted">
+                      划线批注: {res.note}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {searchKeyword.trim() && searchResults.length === 0 && (
+                <p className="text-xs text-paper-muted dark:text-night-muted">未找到匹配的高亮或批注</p>
+              )}
+            </div>
+          </div>
+        ) : currentTab === 'review' ? (
+          <DailyReviewView
+            queue={reviewQueue}
+            colorSemantics={colorSemantics}
+            onSubmitResult={async (uuid, res) => {
+              if (typeof window !== 'undefined' && window.bookEchoAPI) {
+                await window.bookEchoAPI.submitReviewResult(uuid, res);
+              }
+            }}
+            onRefreshQueue={loadReviewQueue}
+          />
+        ) : selectedBook ? (
           <BookDetailView
             book={selectedBook}
-            annotations={displayedAnnotations}
+            annotations={filteredAnnotations}
             colorSemantics={colorSemantics}
             onBack={() => setSelectedBook(null)}
-            onOpenInAppleBooks={handleOpenInAppleBooks}
-            onExportMarkdown={handleExportMarkdown}
+            onOpenInAppleBooks={(id, p) => {
+              if (typeof window !== 'undefined' && window.bookEchoAPI) {
+                window.bookEchoAPI.openInAppleBooks(id, p);
+              }
+            }}
+            onExportMarkdown={id => setExportBookAssetId(id)}
             onToggleStar={handleToggleStar}
             onUpdateCustomNote={handleUpdateCustomNote}
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
-            onOpenQuoteModal={setQuoteModalAnnotation}
+            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
             onRequestContext={handleRequestContext}
           />
         ) : (
-          <BookshelfView
-            books={books}
-            onSelectBook={setSelectedBook}
-          />
-        )
-      )}
-      {currentTab === 'review' && (
-        <DailyReviewView
-          queue={reviewQueue}
-          colorSemantics={colorSemantics}
-          onSubmitResult={handleSubmitReviewResult}
-          onRefreshQueue={fetchReviewQueue}
-        />
-      )}
-      {currentTab === 'search' && (
-        <main className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
-          <div className="max-w-md text-center space-y-3">
-            <h1 className="text-2xl font-serif font-semibold text-paper-text dark:text-night-text">全局搜索</h1>
-            <p className="text-sm text-paper-muted dark:text-night-muted">
-              搜索高亮与笔记
-            </p>
-          </div>
-        </main>
-      )}
-      {quoteModalAnnotation && (
+          <BookshelfView books={books} onSelectBook={handleSelectBook} />
+        )}
+      </main>
+
+      {/* 金句卡片弹窗 */}
+      {activeQuoteItem && (
         <QuoteCardModal
-          annotation={quoteModalAnnotation}
+          annotation={activeQuoteItem}
           bookTitle={
-            quoteModalAnnotation.bookTitle ||
-            books.find(b => b.assetId === quoteModalAnnotation.assetId)?.title ||
+            activeQuoteItem.bookTitle ||
             selectedBook?.title ||
+            books.find(b => b.assetId === activeQuoteItem.assetId)?.title ||
             '未知书籍'
           }
           author={
-            books.find(b => b.assetId === quoteModalAnnotation.assetId)?.author ||
             selectedBook?.author ||
+            books.find(b => b.assetId === activeQuoteItem.assetId)?.author ||
             '未知作者'
           }
-          onClose={() => setQuoteModalAnnotation(null)}
+          onClose={() => setActiveQuoteItem(null)}
         />
       )}
-      {exportModalBook && (
+
+      {/* Markdown 导出弹窗 */}
+      {exportBookAssetId && exportingBook && (
         <ExportModal
-          bookTitle={exportModalBook.title}
-          onClose={() => setExportModalBook(null)}
-          onConfirmExport={handleConfirmExport}
+          bookTitle={exportingBook.title}
+          onClose={() => setExportBookAssetId(null)}
+          onConfirmExport={async fmt => {
+            if (typeof window !== 'undefined' && window.bookEchoAPI) {
+              await window.bookEchoAPI.exportMarkdown(exportBookAssetId, fmt);
+            }
+          }}
         />
       )}
     </div>
