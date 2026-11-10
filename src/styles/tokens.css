@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-paper-bg: #FAF7F2;
+  --color-paper-sidebar: #F3EFE6;
+  --color-paper-card: #FFFFFF;
+  --color-paper-drawer: #F6F2E9;
+  --color-paper-border: #E6E1D6;
+  --color-paper-text: #1E1D1A;
+  --color-paper-muted: #6E6A63;
+  --color-terracotta: #B85D3B;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
