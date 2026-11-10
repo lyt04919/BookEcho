@@ -217,6 +217,8 @@ export class EpubContextEngine {
 
     const cleanTargetHref = targetSpine.href.split('#')[0].split('?')[0];
     const targetBaseName = path.posix.basename(cleanTargetHref);
+    const escapedHref = cleanTargetHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedBase = targetBaseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // 尝试解析 TOC 文件匹配章节标题
     if (tocHref) {
@@ -226,7 +228,7 @@ export class EpubContextEngine {
       if (tocContent) {
         // 1. EPUB 3 HTML nav: href="...ch01.xhtml..."
         const linkRegex = new RegExp(
-          `href=["'][^"']*(?:${cleanTargetHref}|${targetBaseName})[^"']*["'][^>]*>([\\s\\S]*?)<\\/a>`,
+          `href=["'][^"']*(?:${escapedHref}|${escapedBase})[^"']*["'][^>]*>([\\s\\S]*?)<\\/a>`,
           'i'
         );
         const titleMatch = linkRegex.exec(tocContent);
@@ -237,9 +239,51 @@ export class EpubContextEngine {
           }
         }
 
-        // 2. EPUB 2 NCX: <navPoint>...<text>Title</text>...<content src="..."/>
+        // 2. EPUB 2 NCX: 先使用 XML 解析器准确匹配 navPoint
+        try {
+          const parsed = this.parser.parse(tocContent);
+          const findNavPointTitle = (node: any): string | null => {
+            if (!node) return null;
+            if (Array.isArray(node)) {
+              for (const item of node) {
+                const found = findNavPointTitle(item);
+                if (found) return found;
+              }
+              return null;
+            }
+            if (typeof node === 'object') {
+              const src = node?.content?.['@_src'] || '';
+              const cleanSrc = String(src).split('#')[0].split('?')[0];
+              if (
+                cleanSrc &&
+                (cleanSrc === cleanTargetHref ||
+                  path.posix.basename(cleanSrc) === targetBaseName)
+              ) {
+                const text = node?.navLabel?.text;
+                if (text) return String(text).trim();
+              }
+              if (node.navPoint) {
+                const found = findNavPointTitle(node.navPoint);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+
+          const navMap = parsed?.ncx?.navMap;
+          if (navMap) {
+            const title = findNavPointTitle(navMap.navPoint);
+            if (title) {
+              return { chapterTitle: title, sortIndex };
+            }
+          }
+        } catch {
+          // 解析失败则走下方受限正则回退
+        }
+
+        // NCX 正则回退：严格约束在单个 <navPoint> 内，防止跨标签误配
         const ncxRegex = new RegExp(
-          `<navPoint[^>]*>[\\s\\S]*?<text>([^<]+)<\\/text>[\\s\\S]*?src=["'][^"']*(?:${cleanTargetHref}|${targetBaseName})[^"']*["']`,
+          `<navPoint[^>]*>(?:(?!<\\/navPoint>)[\\s\\S])*?<text>([^<]+)<\\/text>(?:(?!<\\/navPoint>)[\\s\\S])*?src=["'][^"']*(?:${escapedHref}|${escapedBase})["']`,
           'i'
         );
         const ncxMatch = ncxRegex.exec(tocContent);
@@ -329,7 +373,17 @@ export class EpubContextEngine {
       }
     }
 
-    const cleanSelected = selectedText.replace(/\s+/g, '').slice(0, 30);
+    const cleanSelected = (selectedText || '').replace(/\s+/g, '').slice(0, 30);
+    if (!cleanSelected) {
+      return {
+        available: false,
+        reason: 'NOT_FOUND',
+        beforeParagraphs: [],
+        currentParagraph: '',
+        selectedText,
+        afterParagraphs: []
+      };
+    }
 
     for (const href of targetHrefs) {
       const cleanHref = href.split('#')[0].split('?')[0];

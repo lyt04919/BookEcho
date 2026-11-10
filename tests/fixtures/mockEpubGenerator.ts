@@ -82,3 +82,78 @@ export function createMockEpubZip(targetDir: string): string {
   zip.writeZip(zipPath);
   return zipPath;
 }
+
+export function createMockEpub2WithNcx(targetDir: string): string {
+  const epubDir = path.join(targetDir, 'mock_epub2_ncx.epub');
+  const metaInf = path.join(epubDir, 'META-INF');
+  const oebps = path.join(epubDir, 'OEBPS');
+
+  fs.mkdirSync(metaInf, { recursive: true });
+  fs.mkdirSync(oebps, { recursive: true });
+
+  // 1. container.xml
+  fs.writeFileSync(
+    path.join(metaInf, 'container.xml'),
+    `<?xml version="1.0"?>
+    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+      <rootfiles>
+        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+      </rootfiles>
+    </container>`
+  );
+
+  // 2. content.opf
+  fs.writeFileSync(
+    path.join(oebps, 'content.opf'),
+    `<?xml version="1.0" encoding="utf-8"?>
+    <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="pub-id">
+      <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <dc:title>EPUB2 NCX 模拟书籍</dc:title>
+      </metadata>
+      <manifest>
+        <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+        <item id="chap1" href="ch01.html" media-type="application/xhtml+xml"/>
+        <item id="chap2" href="ch02.html" media-type="application/xhtml+xml"/>
+      </manifest>
+      <spine toc="ncx">
+        <itemref idref="chap1"/>
+        <itemref idref="chap2"/>
+      </spine>
+    </package>`
+  );
+
+  // 3. toc.ncx with multiple navPoints
+  fs.writeFileSync(
+    path.join(oebps, 'toc.ncx'),
+    `<?xml version="1.0" encoding="utf-8"?>
+    <!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
+    <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+      <navMap>
+        <navPoint id="np-1" playOrder="1">
+          <navLabel>
+            <text>第一章：直觉与理性</text>
+          </navLabel>
+          <content src="ch01.html"/>
+        </navPoint>
+        <navPoint id="np-2" playOrder="2">
+          <navLabel>
+            <text>第二章：启发与偏见</text>
+          </navLabel>
+          <content src="ch02.html"/>
+        </navPoint>
+      </navMap>
+    </ncx>`
+  );
+
+  // 4. ch01.html & ch02.html
+  fs.writeFileSync(
+    path.join(oebps, 'ch01.html'),
+    `<html><body><p>第一章内容。</p></body></html>`
+  );
+  fs.writeFileSync(
+    path.join(oebps, 'ch02.html'),
+    `<html><body><p>第二章内容，涉及代表性启发与锚定效应。</p></body></html>`
+  );
+
+  return epubDir;
+}

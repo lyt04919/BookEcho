@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { createMockEpubDirectory, createMockEpubZip } from './fixtures/mockEpubGenerator';
+import {
+  createMockEpubDirectory,
+  createMockEpubZip,
+  createMockEpub2WithNcx
+} from './fixtures/mockEpubGenerator';
 import { EpubContextEngine } from '../electron/services/epubContextEngine';
 
 describe('EpubContextEngine & Paragraph Context Extractor', () => {
@@ -84,5 +88,35 @@ describe('EpubContextEngine & Paragraph Context Extractor', () => {
     );
     expect(context.available).toBe(false);
     expect(context.reason).toBe('NOT_FOUND');
+  });
+
+  it('should return NOT_FOUND when selectedText is empty or whitespace-only', () => {
+    const emptyContext = engine.extractParagraphContext(
+      epubPath,
+      'epubcfi(/6/2[chapter1]!/4/2/6/1:0)',
+      ''
+    );
+    expect(emptyContext.available).toBe(false);
+    expect(emptyContext.reason).toBe('NOT_FOUND');
+
+    const whitespaceContext = engine.extractParagraphContext(
+      epubPath,
+      'epubcfi(/6/2[chapter1]!/4/2/6/1:0)',
+      '   \n\t  '
+    );
+    expect(whitespaceContext.available).toBe(false);
+    expect(whitespaceContext.reason).toBe('NOT_FOUND');
+  });
+
+  it('should correctly resolve chapter titles in EPUB 2 NCX with multiple navPoints', () => {
+    const ncxEpubPath = createMockEpub2WithNcx(tempDir);
+
+    // Spine index 0 (ch01.html)
+    const chap1 = engine.resolveChapter(ncxEpubPath, 'epubcfi(/6/2[chap1]!/4/2)');
+    expect(chap1.chapterTitle).toBe('第一章：直觉与理性');
+
+    // Spine index 1 (ch02.html) -> step 4 corresponds to index 1
+    const chap2 = engine.resolveChapter(ncxEpubPath, 'epubcfi(/6/4[chap2]!/4/2)');
+    expect(chap2.chapterTitle).toBe('第二章：启发与偏见');
   });
 });
