@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   BookOpen,
-  Sparkles,
   Search,
   Tag,
   FolderOpen,
@@ -16,7 +15,7 @@ import {
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
-export type NavTab = 'books' | 'review' | 'search' | 'starred_notes' | 'insights' | 'tags';
+export type NavTab = 'books' | 'search' | 'starred_notes' | 'insights' | 'tags';
 
 export interface SidebarProps {
   currentTab: NavTab;
@@ -119,18 +118,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <MessageSquareQuote className="w-4 h-4 text-purple-500" />
               <span>批注与星标</span>
-            </button>
-
-            <button
-              onClick={() => onSelectTab('review')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                currentTab === 'review' && !selectedTag
-                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>每日回顾</span>
             </button>
 
             <button

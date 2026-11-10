@@ -14,7 +14,6 @@ describe('App Build Artifact Integrity', () => {
       'src/components/BookshelfView.tsx',
       'src/components/BookDetailView.tsx',
       'src/components/HighlightCard.tsx',
-      'src/components/DailyReviewView.tsx',
       'src/components/GlobalSearchView.tsx',
       'src/components/QuoteCardModal.tsx',
       'src/components/ExportModal.tsx',
@@ -66,7 +65,6 @@ describe('App State and Orchestration', () => {
     const html = renderToStaticMarkup(React.createElement(App, null));
     expect(html).toContain('BookEcho');
     expect(html).toContain('全部书架');
-    expect(html).toContain('每日回顾');
     expect(html).toContain('全局搜索');
     expect(html).toContain('我的书库');
   });
@@ -79,8 +77,8 @@ describe('App State and Orchestration', () => {
     dispatcher.current = {
       useState: (initial: any) => {
         stateCallIndex++;
-        // Index 15 in App is hasPermissionError
-        if (stateCallIndex === 15) {
+        // Index 14 in App is hasPermissionError
+        if (stateCallIndex === 14) {
           return [true, vi.fn()];
         }
         return [initial, vi.fn()];
@@ -112,12 +110,12 @@ describe('App State and Orchestration', () => {
         if (stateCallIndex === 1) {
           return ['search', vi.fn()];
         }
-        // Index 10 is searchKeyword
-        if (stateCallIndex === 10) {
+        // Index 9 is searchKeyword
+        if (stateCallIndex === 9) {
           return ['财富', vi.fn()];
         }
-        // Index 11 is searchResults
-        if (stateCallIndex === 11) {
+        // Index 10 is searchResults
+        if (stateCallIndex === 10) {
           return [[mockAnnotation], vi.fn()];
         }
         return [initial, vi.fn()];
@@ -160,12 +158,12 @@ describe('App State and Orchestration', () => {
         if (stateCallIndex === 3) {
           return [null, setSelectedBookMock];
         }
-        // Index 10 is searchKeyword
-        if (stateCallIndex === 10) {
+        // Index 9 is searchKeyword
+        if (stateCallIndex === 9) {
           return ['财富', vi.fn()];
         }
-        // Index 11 is searchResults
-        if (stateCallIndex === 11) {
+        // Index 10 is searchResults
+        if (stateCallIndex === 10) {
           return [[mockAnnotation], vi.fn()];
         }
         return [initial, vi.fn()];
@@ -188,7 +186,7 @@ describe('App State and Orchestration', () => {
     }
   });
 
-  it('should render daily review view when currentTab is review', () => {
+  it('should render starred and notes view when currentTab is starred_notes', () => {
     const dispatcher = (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher;
     const prevDispatcher = dispatcher.current;
 
@@ -198,11 +196,7 @@ describe('App State and Orchestration', () => {
         stateCallIndex++;
         // Index 1 is currentTab
         if (stateCallIndex === 1) {
-          return ['review', vi.fn()];
-        }
-        // Index 5 is reviewQueue
-        if (stateCallIndex === 5) {
-          return [[mockAnnotation], vi.fn()];
+          return ['starred_notes', vi.fn()];
         }
         return [initial, vi.fn()];
       },
@@ -213,8 +207,7 @@ describe('App State and Orchestration', () => {
     try {
       const element = App() as ReactElement<any>;
       const html = renderToStaticMarkup(element);
-      expect(html).toContain('每日漫游 · 专注模式');
-      expect(html).toContain('致富不是靠运气，而是靠技能。');
+      expect(html).toContain('批注与星标精选');
     } finally {
       dispatcher.current = prevDispatcher;
     }
@@ -236,12 +229,12 @@ describe('App State and Orchestration', () => {
         if (stateCallIndex === 4) {
           return [[mockAnnotation], vi.fn()];
         }
-        // Index 13 is activeQuoteItem
-        if (stateCallIndex === 13) {
+        // Index 12 is activeQuoteItem
+        if (stateCallIndex === 12) {
           return [mockAnnotation, vi.fn()];
         }
-        // Index 14 is exportBookAssetId
-        if (stateCallIndex === 14) {
+        // Index 13 is exportBookAssetId
+        if (stateCallIndex === 13) {
           return ['book-1', vi.fn()];
         }
         return [initial, vi.fn()];

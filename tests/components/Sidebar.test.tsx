@@ -41,9 +41,9 @@ describe('Sidebar Component', () => {
     const html = renderToStaticMarkup(<Sidebar {...defaultProps} />);
     expect(html).toContain('全部书架');
     expect(html).toContain('批注与星标');
-    expect(html).toContain('每日回顾');
     expect(html).toContain('全局搜索');
     expect(html).toContain('阅读足迹');
+    expect(html).not.toContain('每日回顾');
   });
 
   it('should highlight active tab appropriately', () => {
@@ -52,9 +52,6 @@ describe('Sidebar Component', () => {
 
     const starredHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="starred_notes" />);
     expect(starredHtml).toContain('批注与星标');
-
-    const reviewHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="review" />);
-    expect(reviewHtml).toContain('每日回顾');
 
     const searchHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="search" />);
     expect(searchHtml).toContain('全局搜索');
@@ -166,16 +163,13 @@ describe('Sidebar Component', () => {
 
     // 导航区
     const nav = topDiv.props.children[2];
-    const [booksBtn, starredBtn, reviewBtn, searchBtn] = nav.props.children;
+    const [booksBtn, starredBtn, searchBtn] = nav.props.children;
 
     booksBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('books');
 
     starredBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('starred_notes');
-
-    reviewBtn.props.onClick();
-    expect(onSelectTab).toHaveBeenCalledWith('review');
 
     searchBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('search');

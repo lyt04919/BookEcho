@@ -11,7 +11,6 @@ import {
 import { Sidebar, NavTab } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
 import { BookDetailView } from './components/BookDetailView';
-import { DailyReviewView } from './components/DailyReviewView';
 import { QuoteCardModal } from './components/QuoteCardModal';
 import { ExportModal } from './components/ExportModal';
 import { PermissionGuide } from './components/PermissionGuide';
@@ -35,7 +34,6 @@ export default function App() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationItem[]>([]);
-  const [reviewQueue, setReviewQueue] = useState<AnnotationItem[]>([]);
   const [colorSemantics, setColorSemantics] = useState<ColorSemanticConfig[]>(DEFAULT_SEMANTICS);
   const [tags, setTags] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
@@ -181,25 +179,6 @@ export default function App() {
     }
   };
 
-  // 加载每日回顾
-  const loadReviewQueue = async () => {
-    if (typeof window !== 'undefined' && window.bookEchoAPI) {
-      try {
-        const q = await window.bookEchoAPI.getDailyReviewQueue(8);
-        setReviewQueue(q || []);
-      } catch (err) {
-        console.error('Failed to load daily review queue', err);
-        setReviewQueue([]);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (currentTab === 'review') {
-      loadReviewQueue();
-    }
-  }, [currentTab]);
-
   // 全局搜索触发（防抖 250ms）
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -222,17 +201,13 @@ export default function App() {
   const handleToggleStar = async (uuid: string) => {
     const item =
       currentAnnotations.find(a => a.uuid === uuid) ||
-      allAnnotations.find(a => a.uuid === uuid) ||
-      reviewQueue.find(a => a.uuid === uuid);
+      allAnnotations.find(a => a.uuid === uuid);
     if (!item) return;
     const nextStarred = !item.isStarred;
     setCurrentAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
     setAllAnnotations(prev =>
-      prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
-    );
-    setReviewQueue(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -250,9 +225,6 @@ export default function App() {
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
     setAllAnnotations(prev =>
-      prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
-    );
-    setReviewQueue(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -284,15 +256,6 @@ export default function App() {
         return a;
       })
     );
-    setReviewQueue(prev =>
-      prev.map(a => {
-        if (a.uuid === uuid) {
-          const prevTags = a.tags || [];
-          return prevTags.includes(tag) ? a : { ...a, tags: [...prevTags, tag] };
-        }
-        return a;
-      })
-    );
     setTags(prev => (prev.includes(tag) ? prev : [...prev, tag]));
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -310,9 +273,6 @@ export default function App() {
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
     setAllAnnotations(prev =>
-      prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
-    );
-    setReviewQueue(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -360,12 +320,6 @@ export default function App() {
         tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
       }))
     );
-    setReviewQueue(prev =>
-      prev.map(a => ({
-        ...a,
-        tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
-      }))
-    );
     if (selectedTag === cleanOld) {
       setSelectedTag(cleanNew);
     }
@@ -390,9 +344,6 @@ export default function App() {
       prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
     );
     setAllAnnotations(prev =>
-      prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
-    );
-    setReviewQueue(prev =>
       prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
     );
     if (selectedTag === clean) {
@@ -457,9 +408,11 @@ export default function App() {
   };
 
   // 全书库中的批注与星标精华
-  const starredAndNoteAnnos = allAnnotations.filter(
-    a => a.isStarred || Boolean(a.note?.trim() || a.customNote?.trim())
-  );
+  const starredAndNoteAnnos = Array.isArray(allAnnotations)
+    ? allAnnotations.filter(
+        a => a.isStarred || Boolean(a.note?.trim() || a.customNote?.trim())
+      )
+    : [];
 
   const exportingBook = exportBookAssetId
     ? books.find(b => b.assetId === exportBookAssetId) || selectedBook
@@ -565,31 +518,6 @@ export default function App() {
             onRemoveTag={handleRemoveTag}
             onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
             onRequestContext={handleRequestContext}
-          />
-        ) : currentTab === 'review' ? (
-          <DailyReviewView
-            queue={reviewQueue}
-            allAnnotations={allAnnotations}
-            books={books}
-            colorSemantics={colorSemantics}
-            availableTags={tags}
-            onSubmitResult={async (uuid, res) => {
-              if (typeof window !== 'undefined' && window.bookEchoAPI) {
-                await window.bookEchoAPI.submitReviewResult(uuid, res);
-              }
-            }}
-            onRefreshQueue={loadReviewQueue}
-            onSelectBook={handleSelectBook}
-            onToggleStar={handleToggleStar}
-            onUpdateCustomNote={handleUpdateCustomNote}
-            onAddTag={handleAddTag}
-            onRemoveTag={handleRemoveTag}
-            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
-            onRequestContext={handleRequestContext}
-            onManageTags={() => {
-              setSelectedBook(null);
-              setCurrentTab('tags');
-            }}
           />
         ) : currentTab === 'starred_notes' ? (
           /* 批注与星标独立专属汇总馆 */
