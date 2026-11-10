@@ -45,7 +45,7 @@ describe('MarkdownExporter', () => {
     expect(md).toContain('`#财富` `#杠杆`');
   });
 
-  it('should format Obsidian-enhanced markdown with YAML frontmatter and Callout blocks', () => {
+  it('should format Obsidian-enhanced markdown with YAML frontmatter, Callout blocks, and star status', () => {
     const md = MarkdownExporter.formatObsidianMarkdown(mockBook, mockAnnotations);
     expect(md).toContain('---');
     expect(md).toContain('title: "纳瓦尔宝典"');
@@ -54,10 +54,40 @@ describe('MarkdownExporter', () => {
     expect(md).toContain('tags:');
     expect(md).toContain('  - books/highlights');
     expect(md).toContain('> [!quote] 🟡 核心论点');
-    expect(md).toContain('> 赚大钱的人从来不是靠运气。');
+    expect(md).toContain('> ⭐ 赚大钱的人从来不是靠运气。');
     expect(md).toContain('> **想法**：创造独特性与杠杆');
     expect(md).toContain('> **扩展**：必须找到自己的特定知识');
     expect(md).toContain('> #财富 #杠杆');
+  });
+
+  it('should preserve blockquote prefix for multi-line quotes and notes in both formats', () => {
+    const multilineAnnotation: AnnotationItem = {
+      uuid: 'anno-multi',
+      assetId: 'book-1',
+      selectedText: '第一行引文内容\n第二行引文内容\n第三行引文内容',
+      note: '批注第一行\n批注第二行',
+      representativeText: null,
+      colorKey: 'blue',
+      locationCfi: null,
+      chapterTitle: '第二章：思考',
+      creationDateMs: 1678307200000,
+      modificationDateMs: 1678307200000,
+      sortIndex: 1,
+      customNote: '思考第一行\n思考第二行',
+      isStarred: false,
+      tags: ['思考']
+    };
+
+    const std = MarkdownExporter.formatStandardMarkdown(mockBook, [multilineAnnotation]);
+    expect(std).toContain('> 第一行引文内容\n> 第二行引文内容\n> 第三行引文内容');
+    expect(std).toContain('> **批注**：批注第一行\n> 批注第二行');
+    expect(std).toContain('> **延伸思考**：思考第一行\n> 思考第二行');
+
+    const obs = MarkdownExporter.formatObsidianMarkdown(mockBook, [multilineAnnotation]);
+    expect(obs).toContain('> [!quote] 🔵 概念与背景');
+    expect(obs).toContain('> 第一行引文内容\n> 第二行引文内容\n> 第三行引文内容');
+    expect(obs).toContain('> **想法**：批注第一行\n> 批注第二行');
+    expect(obs).toContain('> **扩展**：思考第一行\n> 思考第二行');
   });
 
   it('should handle null book metadata and empty chapter titles with defaults', () => {

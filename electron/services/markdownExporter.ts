@@ -10,6 +10,10 @@ const COLOR_EMOJIS: Record<HighlightColor, string> = {
 };
 
 export class MarkdownExporter {
+  public static prefixLines(text: string, prefix = '> '): string[] {
+    return text.split('\n').map(line => `${prefix}${line}`);
+  }
+
   public static groupAnnotationsByChapter(annotations: AnnotationItem[]): Map<string, AnnotationItem[]> {
     const map = new Map<string, AnnotationItem[]>();
     for (const anno of annotations) {
@@ -45,14 +49,14 @@ export class MarkdownExporter {
         const star = item.isStarred ? '⭐ ' : '';
         const tagLine = item.tags && item.tags.length > 0 ? item.tags.map(t => `\`#${t}\``).join(' ') : '';
 
-        lines.push(`> ${star}${item.selectedText}`);
+        lines.push(...this.prefixLines(`${star}${item.selectedText}`));
         lines.push('>');
 
         if (item.note) {
-          lines.push(`> **批注**：${item.note}`);
+          lines.push(...this.prefixLines(`**批注**：${item.note}`));
         }
         if (item.customNote) {
-          lines.push(`> **延伸思考**：${item.customNote}`);
+          lines.push(...this.prefixLines(`**延伸思考**：${item.customNote}`));
         }
         if (tagLine) {
           lines.push(`> **标签**：${tagLine}`);
@@ -89,16 +93,17 @@ export class MarkdownExporter {
 
       for (const item of items) {
         const calloutHeader = COLOR_EMOJIS[item.colorKey] || '🟡 高亮';
+        const star = item.isStarred ? '⭐ ' : '';
         lines.push(`> [!quote] ${calloutHeader}`);
-        lines.push(`> ${item.selectedText}`);
+        lines.push(...this.prefixLines(`${star}${item.selectedText}`));
 
         if (item.note) {
           lines.push(`> `);
-          lines.push(`> **想法**：${item.note}`);
+          lines.push(...this.prefixLines(`**想法**：${item.note}`));
         }
         if (item.customNote) {
           lines.push(`> `);
-          lines.push(`> **扩展**：${item.customNote}`);
+          lines.push(...this.prefixLines(`**扩展**：${item.customNote}`));
         }
         if (item.tags && item.tags.length > 0) {
           lines.push(`> `);
