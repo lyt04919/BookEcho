@@ -60,16 +60,21 @@ export class SnapshotSyncer {
     fs.copyFileSync(sourceDbPath, targetDbPath);
 
     // 同步复制 WAL 和 SHM（如果存在），保证只读查询数据完整且不锁死主库
+    // 若源文件不存在但目标缓存存在（说明已被 checkpoint 清理），必须清理旧文件以避免 SQLITE_CORRUPT
     const walSource = `${sourceDbPath}-wal`;
     const walTarget = `${targetDbPath}-wal`;
     if (fs.existsSync(walSource)) {
       fs.copyFileSync(walSource, walTarget);
+    } else if (fs.existsSync(walTarget)) {
+      fs.unlinkSync(walTarget);
     }
 
     const shmSource = `${sourceDbPath}-shm`;
     const shmTarget = `${targetDbPath}-shm`;
     if (fs.existsSync(shmSource)) {
       fs.copyFileSync(shmSource, shmTarget);
+    } else if (fs.existsSync(shmTarget)) {
+      fs.unlinkSync(shmTarget);
     }
 
     return targetDbPath;
@@ -79,44 +84,49 @@ export class SnapshotSyncer {
     const sourceBk = this.findDatabaseFile(this.bkDir, 'BKLibrary');
     if (!sourceBk) return [];
 
-    const snapshotBk = this.createSnapshot(sourceBk, 'snapshot_BKLibrary.sqlite');
-    const db = new Database(snapshotBk, { readonly: true });
-
     const sourceAe = this.findDatabaseFile(this.aeDir, 'AEAnnotation');
     let highlightCounts: Record<string, number> = {};
     if (sourceAe) {
       const snapshotAe = this.createSnapshot(sourceAe, 'snapshot_AEAnnotation_count.sqlite');
       const aeDb = new Database(snapshotAe, { readonly: true });
-      const counts = aeDb.prepare(`
-        SELECT ZANNOTATIONASSETID as assetId, count(*) as cnt
-        FROM ZAEANNOTATION
-        WHERE ZANNOTATIONDELETED = 0
-          AND ((ZANNOTATIONSELECTEDTEXT IS NOT NULL AND TRIM(ZANNOTATIONSELECTEDTEXT) != '')
-               OR (ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) != ''))
-        GROUP BY ZANNOTATIONASSETID
-      `).all() as { assetId: string; cnt: number }[];
-      counts.forEach(row => {
-        highlightCounts[row.assetId] = row.cnt;
-      });
-      aeDb.close();
+      try {
+        const counts = aeDb.prepare(`
+          SELECT ZANNOTATIONASSETID as assetId, count(*) as cnt
+          FROM ZAEANNOTATION
+          WHERE ZANNOTATIONDELETED = 0
+            AND ((ZANNOTATIONSELECTEDTEXT IS NOT NULL AND TRIM(ZANNOTATIONSELECTEDTEXT) != '')
+                 OR (ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) != ''))
+          GROUP BY ZANNOTATIONASSETID
+        `).all() as { assetId: string; cnt: number }[];
+        counts.forEach(row => {
+          highlightCounts[row.assetId] = row.cnt;
+        });
+      } finally {
+        aeDb.close();
+      }
     }
 
-    const rows = db.prepare(`
-      SELECT
-        ZASSETID AS assetId,
-        ZTITLE AS title,
-        ZAUTHOR AS author,
-        ZGENRE AS genre,
-        ZPATH AS epubPath,
-        ZREADINGPROGRESS AS readingProgress,
-        ZLASTOPENDATE AS lastOpenDate,
-        ZCOVERURL AS coverUrl
-      FROM ZBKLIBRARYASSET
-      WHERE ZTITLE IS NOT NULL AND ZASSETID IS NOT NULL
-      ORDER BY ZLASTOPENDATE DESC
-    `).all() as any[];
-
-    db.close();
+    const snapshotBk = this.createSnapshot(sourceBk, 'snapshot_BKLibrary.sqlite');
+    const db = new Database(snapshotBk, { readonly: true });
+    let rows: any[] = [];
+    try {
+      rows = db.prepare(`
+        SELECT
+          ZASSETID AS assetId,
+          ZTITLE AS title,
+          ZAUTHOR AS author,
+          ZGENRE AS genre,
+          ZPATH AS epubPath,
+          ZREADINGPROGRESS AS readingProgress,
+          ZLASTOPENDATE AS lastOpenDate,
+          ZCOVERURL AS coverUrl
+        FROM ZBKLIBRARYASSET
+        WHERE ZTITLE IS NOT NULL AND ZASSETID IS NOT NULL
+        ORDER BY ZLASTOPENDATE DESC
+      `).all() as any[];
+    } finally {
+      db.close();
+    }
 
     return rows.map(r => ({
       assetId: r.assetId,
@@ -141,35 +151,39 @@ export class SnapshotSyncer {
 
     const snapshotAe = this.createSnapshot(sourceAe, 'snapshot_AEAnnotation.sqlite');
     const db = new Database(snapshotAe, { readonly: true });
+    let rows: any[] = [];
 
-    let sql = `
-      SELECT
-        ZANNOTATIONUUID AS uuid,
-        ZANNOTATIONASSETID AS assetId,
-        ZANNOTATIONSELECTEDTEXT AS selectedText,
-        ZANNOTATIONNOTE AS note,
-        ZANNOTATIONREPRESENTATIVETEXT AS representativeText,
-        ZANNOTATIONSTYLE AS style,
-        ZANNOTATIONISUNDERLINE AS isUnderline,
-        ZANNOTATIONLOCATION AS locationCfi,
-        ZANNOTATIONCREATIONDATE AS creationDate,
-        ZANNOTATIONMODIFICATIONDATE AS modificationDate,
-        ZFUTUREPROOFING5 AS chapterTitleHint
-      FROM ZAEANNOTATION
-      WHERE ZANNOTATIONDELETED = 0
-        AND ((ZANNOTATIONSELECTEDTEXT IS NOT NULL AND TRIM(ZANNOTATIONSELECTEDTEXT) != '')
-             OR (ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) != ''))
-    `;
+    try {
+      let sql = `
+        SELECT
+          ZANNOTATIONUUID AS uuid,
+          ZANNOTATIONASSETID AS assetId,
+          ZANNOTATIONSELECTEDTEXT AS selectedText,
+          ZANNOTATIONNOTE AS note,
+          ZANNOTATIONREPRESENTATIVETEXT AS representativeText,
+          ZANNOTATIONSTYLE AS style,
+          ZANNOTATIONISUNDERLINE AS isUnderline,
+          ZANNOTATIONLOCATION AS locationCfi,
+          ZANNOTATIONCREATIONDATE AS creationDate,
+          ZANNOTATIONMODIFICATIONDATE AS modificationDate,
+          ZFUTUREPROOFING5 AS chapterTitleHint
+        FROM ZAEANNOTATION
+        WHERE ZANNOTATIONDELETED = 0
+          AND ((ZANNOTATIONSELECTEDTEXT IS NOT NULL AND TRIM(ZANNOTATIONSELECTEDTEXT) != '')
+               OR (ZANNOTATIONNOTE IS NOT NULL AND TRIM(ZANNOTATIONNOTE) != ''))
+      `;
 
-    const params: any[] = [];
-    if (assetId) {
-      sql += ` AND ZANNOTATIONASSETID = ?`;
-      params.push(assetId);
+      const params: any[] = [];
+      if (assetId) {
+        sql += ` AND ZANNOTATIONASSETID = ?`;
+        params.push(assetId);
+      }
+      sql += ` ORDER BY ZANNOTATIONLOCATION ASC, ZANNOTATIONCREATIONDATE ASC`;
+
+      rows = db.prepare(sql).all(...params) as any[];
+    } finally {
+      db.close();
     }
-    sql += ` ORDER BY ZANNOTATIONLOCATION ASC, ZANNOTATIONCREATIONDATE ASC`;
-
-    const rows = db.prepare(sql).all(...params) as any[];
-    db.close();
 
     return rows.map(r => ({
       uuid: r.uuid,

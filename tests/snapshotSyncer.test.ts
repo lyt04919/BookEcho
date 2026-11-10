@@ -93,4 +93,33 @@ describe('SnapshotSyncer & SQLite Extraction', () => {
     expect(fs.existsSync(path.join(cacheDir, 'snapshot_BKLibrary.sqlite-shm'))).toBe(true);
     expect(fs.readFileSync(path.join(cacheDir, 'snapshot_BKLibrary.sqlite-wal'), 'utf-8')).toBe('wal-content');
   });
+
+  it('should cleanly unlink stale WAL and SHM files in cache when source WAL and SHM are removed', () => {
+    const walFile = `${mockPaths.bkDbPath}-wal`;
+    const shmFile = `${mockPaths.bkDbPath}-shm`;
+    fs.writeFileSync(walFile, 'wal-content');
+    fs.writeFileSync(shmFile, 'shm-content');
+
+    const syncer = new SnapshotSyncer({
+      customBkDir: mockPaths.bkDir,
+      customAeDir: mockPaths.aeDir,
+      cacheDir: cacheDir
+    });
+
+    // First sync with WAL/SHM present
+    syncer.extractBooks();
+    const cachedWal = path.join(cacheDir, 'snapshot_BKLibrary.sqlite-wal');
+    const cachedShm = path.join(cacheDir, 'snapshot_BKLibrary.sqlite-shm');
+    expect(fs.existsSync(cachedWal)).toBe(true);
+    expect(fs.existsSync(cachedShm)).toBe(true);
+
+    // Source WAL/SHM checkpointed and removed
+    fs.unlinkSync(walFile);
+    fs.unlinkSync(shmFile);
+
+    // Second sync should delete stale cache WAL/SHM
+    syncer.extractBooks();
+    expect(fs.existsSync(cachedWal)).toBe(false);
+    expect(fs.existsSync(cachedShm)).toBe(false);
+  });
 });
