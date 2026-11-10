@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sidebar, SidebarProps } from '../../src/components/Sidebar';
+import App from '../../src/App';
 import { ColorSemanticConfig } from '../../electron/types/ipc';
 
 const mockColorSemantics: ColorSemanticConfig[] = [
@@ -73,6 +74,16 @@ describe('Sidebar Component', () => {
     const html = renderToStaticMarkup(<Sidebar {...defaultProps} tags={[]} />);
     expect(html).not.toContain('#心智模型');
     expect(html).not.toContain('<div class="flex flex-wrap gap-1.5 px-2">');
+  });
+
+  it('should include dark mode styling classes corresponding to night tokens', () => {
+    const html = renderToStaticMarkup(<Sidebar {...defaultProps} tags={['测试标签']} />);
+    expect(html).toContain('dark:border-night-border');
+    expect(html).toContain('dark:bg-night-sidebar');
+    expect(html).toContain('dark:text-night-text');
+    expect(html).toContain('dark:text-night-muted');
+    expect(html).toContain('dark:bg-night-drawer');
+    expect(html).toContain('dark:hover:bg-white/5');
   });
 
   it('should show "深色夜读" when in light mode and "浅色模式" when in dark mode', () => {
@@ -157,5 +168,14 @@ describe('Sidebar Component', () => {
 
     darkModeBtn.props.onClick();
     expect(onToggleDarkMode).toHaveBeenCalled();
+  });
+});
+
+describe('App Integration with Sidebar', () => {
+  it('should render App with Sidebar correctly', () => {
+    const html = renderToStaticMarkup(<App />);
+    expect(html).toContain('BookEcho');
+    expect(html).toContain('全部书架');
+    expect(html).toContain('BookEcho 书架视图');
   });
 });

@@ -35,6 +35,14 @@ export default function App() {
     }
   }, []);
 
+  const handleSelectTab = (tab: 'books' | 'review' | 'search') => {
+    setCurrentTab(tab);
+    if (tab === 'books') {
+      setSelectedColor(null);
+      setSelectedTag(null);
+    }
+  };
+
   const handleSelectCustomDir = async () => {
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -63,7 +71,7 @@ export default function App() {
     <div className={`flex h-screen w-screen overflow-hidden ${isDarkMode ? 'dark bg-night-bg text-night-text' : 'bg-paper-bg text-paper-text'}`}>
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
         onSelectColor={setSelectedColor}
@@ -76,9 +84,9 @@ export default function App() {
       />
       <main className="flex-1 flex flex-col items-center justify-center p-8 select-none">
         <div className="max-w-md text-center space-y-3">
-          <h1 className="text-2xl font-serif font-semibold text-paper-text">BookEcho 书架视图</h1>
-          <p className="text-sm text-paper-muted">
-            当前视图: <span className="font-medium text-paper-terracotta">{currentTab}</span>
+          <h1 className="text-2xl font-serif font-semibold text-paper-text dark:text-night-text">BookEcho 书架视图</h1>
+          <p className="text-sm text-paper-muted dark:text-night-muted">
+            当前视图: <span className="font-medium text-paper-terracotta dark:text-night-terracotta">{currentTab}</span>
             {selectedColor && <> | 颜色过滤: <span className="font-medium">{selectedColor}</span></>}
             {selectedTag && <> | 标签: <span className="font-medium">#{selectedTag}</span></>}
           </p>
