@@ -502,4 +502,106 @@ export class EpubContextEngine {
       return null;
     }
   }
+
+  public extractTableOfContents(epubPath: string): string[] {
+    if (!epubPath || !fs.existsSync(epubPath)) return [];
+
+    const opfPath = this.getOpfPath(epubPath);
+    if (!opfPath) return [];
+
+    const { opfDir, spine, tocHref } = this.parseSpineAndManifest(epubPath, opfPath);
+    const titles: string[] = [];
+
+    // 1. 如果有 TOC 文件（EPUB 3 nav 或 EPUB 2 NCX）
+    if (tocHref) {
+      const cleanTocHref = tocHref.split('#')[0].split('?')[0];
+      const tocFullPath = path.posix.join(opfDir === '.' ? '' : opfDir, cleanTocHref);
+      const tocContent = this.readEpubFileContent(epubPath, tocFullPath);
+
+      if (tocContent) {
+        // 先检测是否是 EPUB 2 NCX
+        if (tocContent.includes('<navMap>') || cleanTocHref.endsWith('.ncx')) {
+          try {
+            const parsed = this.parser.parse(tocContent);
+            const extractNavPoints = (node: any) => {
+              if (!node) return;
+              if (Array.isArray(node)) {
+                node.forEach(item => extractNavPoints(item));
+                return;
+              }
+              if (typeof node === 'object') {
+                const text = node?.navLabel?.text;
+                if (text && typeof text === 'string') {
+                  const cleaned = text.trim();
+                  if (cleaned && !titles.includes(cleaned)) {
+                    titles.push(cleaned);
+                  }
+                } else if (text && typeof text === 'object' && text['#text']) {
+                  const cleaned = String(text['#text']).trim();
+                  if (cleaned && !titles.includes(cleaned)) {
+                    titles.push(cleaned);
+                  }
+                }
+                if (node.navPoint) {
+                  extractNavPoints(node.navPoint);
+                }
+              }
+            };
+
+            const navMap = parsed?.ncx?.navMap;
+            if (navMap) {
+              extractNavPoints(navMap.navPoint);
+            }
+          } catch {
+            const regex = /<navPoint[^>]*>[\s\S]*?<navLabel>[\s\S]*?<text>([^<]+)<\/text>/gi;
+            let match;
+            while ((match = regex.exec(tocContent)) !== null) {
+              const t = match[1].trim();
+              if (t && !titles.includes(t)) {
+                titles.push(t);
+              }
+            }
+          }
+        } else {
+          // EPUB 3 HTML nav: 提取所有 <a ...>章节标题</a>
+          const regex = /<a[^>]*>([\s\S]*?)<\/a>/gi;
+          let match;
+          while ((match = regex.exec(tocContent)) !== null) {
+            const raw = match[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            if (raw && !titles.includes(raw)) {
+              titles.push(raw);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. 如果从 TOC 中获取的章节太少（例如小于 2 个），尝试从 spine 各 HTML 文件的 <h1>/<h2>/<title> 中补充
+    if (titles.length < 2 && spine.length > 0) {
+      for (const item of spine) {
+        const cleanHref = item.href.split('#')[0].split('?')[0];
+        const chapterFullPath = path.posix.join(opfDir === '.' ? '' : opfDir, cleanHref);
+        const html = this.readEpubFileContent(epubPath, chapterFullPath);
+        if (html) {
+          const hMatch = /<h[1-2][^>]*>([\s\S]*?)<\/h[1-2]>/i.exec(html);
+          if (hMatch) {
+            const t = hMatch[1].replace(/<[^>]+>/g, '').trim();
+            if (t && !titles.includes(t)) {
+              titles.push(t);
+              continue;
+            }
+          }
+          const tMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+          if (tMatch) {
+            const t = tMatch[1].trim();
+            if (t && !titles.includes(t)) {
+              titles.push(t);
+            }
+          }
+        }
+      }
+    }
+
+    return titles;
+  }
 }

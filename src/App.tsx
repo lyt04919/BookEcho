@@ -4,7 +4,8 @@ import {
   AnnotationItem,
   ColorSemanticConfig,
   HighlightColor,
-  HighlightContextResult
+  HighlightContextResult,
+  ChapterItem
 } from '../electron/types/ipc';
 import { Sidebar } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
@@ -43,6 +44,7 @@ export default function App() {
   const [hasPermissionError, setHasPermissionError] = useState(false);
   const [allAnnotations, setAllAnnotations] = useState<AnnotationItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [bookChapters, setBookChapters] = useState<ChapterItem[]>([]);
 
   // 初始化加载数据
   const loadInitialData = async () => {
@@ -89,14 +91,20 @@ export default function App() {
     setCurrentTab('books');
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
-        const annos = await window.bookEchoAPI.getBookAnnotations(book.assetId);
+        const [annos, chs] = await Promise.all([
+          window.bookEchoAPI.getBookAnnotations(book.assetId),
+          window.bookEchoAPI.getBookChapters(book.assetId)
+        ]);
         setCurrentAnnotations(annos || []);
+        setBookChapters(chs || []);
       } catch (err) {
-        console.error('Failed to load book annotations', err);
+        console.error('Failed to load book annotations or chapters', err);
         setCurrentAnnotations([]);
+        setBookChapters([]);
       }
     } else {
       setCurrentAnnotations([]);
+      setBookChapters([]);
     }
   };
 
@@ -297,9 +305,8 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={tab => {
           setCurrentTab(tab);
-          if (tab !== 'books') {
-            setSelectedBook(null);
-          }
+          setSelectedBook(null);
+          setBookChapters([]);
         }}
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
@@ -318,7 +325,7 @@ export default function App() {
         books={books}
         selectedBook={selectedBook}
         onSelectBook={handleSelectBook}
-        chapters={currentBookChapters}
+        chapters={bookChapters.length > 0 ? bookChapters : currentBookChapters}
         onSelectChapter={handleSelectChapter}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}

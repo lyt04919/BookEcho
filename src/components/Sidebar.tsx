@@ -29,7 +29,7 @@ export interface SidebarProps {
   books?: BookItem[];
   selectedBook?: BookItem | null;
   onSelectBook?: (book: BookItem) => void;
-  chapters?: string[];
+  chapters?: (string | { title: string; notesCount: number })[];
   onSelectChapter?: (chapter: string) => void;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
@@ -133,16 +133,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>章节目录</span>
             </div>
             <div className="space-y-0.5">
-              {chapters.map(ch => (
-                <button
-                  key={ch}
-                  onClick={() => onSelectChapter && onSelectChapter(ch)}
-                  className="w-full text-left truncate px-3 py-1.5 rounded text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors"
-                  title={ch}
-                >
-                  {ch}
-                </button>
-              ))}
+              {chapters.map(item => {
+                const title = typeof item === 'string' ? item : item.title;
+                const notesCount = typeof item === 'string' ? 0 : item.notesCount;
+                return (
+                  <button
+                    key={title}
+                    onClick={() => onSelectChapter && onSelectChapter(title)}
+                    className="w-full flex items-center justify-between px-3 py-1.5 rounded text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors group"
+                    title={title}
+                  >
+                    <span className="truncate max-w-[135px] font-serif group-hover:text-paper-terracotta dark:group-hover:text-night-terracotta">
+                      {title}
+                    </span>
+                    {notesCount > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-paper-drawer dark:bg-night-drawer text-paper-terracotta dark:text-night-terracotta font-mono font-medium">
+                        {notesCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : !selectedBook && booksWithNotes.length > 0 ? (

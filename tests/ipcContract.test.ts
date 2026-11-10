@@ -7,6 +7,7 @@ describe('IPC API Contract Check', () => {
   const EXPECTED_API_KEYS: (keyof BookEchoAPI)[] = [
     'getBooks',
     'getBookAnnotations',
+    'getBookChapters',
     'searchAnnotations',
     'getHighlightContext',
     'updateAnnotationMeta',
@@ -26,6 +27,7 @@ describe('IPC API Contract Check', () => {
   const EXPECTED_CHANNELS = [
     'books:getAll',
     'annotations:getByBook',
+    'books:getChapters',
     'annotations:search',
     'context:get',
     'meta:update',
@@ -44,7 +46,7 @@ describe('IPC API Contract Check', () => {
 
   it('should define all required API methods on window.bookEchoAPI interface', () => {
     // 静态校验契约完备性
-    expect(EXPECTED_API_KEYS.length).toBe(16);
+    expect(EXPECTED_API_KEYS.length).toBe(17);
   });
 
   it('should have matching ipcRenderer invoke channels in preload.ts', () => {
@@ -72,8 +74,8 @@ describe('IPC API Contract Check', () => {
     const preloadChannels = Array.from(preloadContent.matchAll(/ipcRenderer\.invoke\(['"]([^'"]+)['"]/g)).map(m => m[1]);
     const mainChannels = Array.from(mainContent.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)).map(m => m[1]);
 
-    expect(preloadChannels.length).toBe(16);
-    expect(mainChannels.length).toBe(16);
+    expect(preloadChannels.length).toBe(17);
+    expect(mainChannels.length).toBe(17);
     expect(preloadChannels.sort()).toEqual(mainChannels.sort());
   });
 });

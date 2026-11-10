@@ -96,6 +96,39 @@ function registerIpcHandlers() {
     return result;
   });
 
+  ipcMain.handle('books:getChapters', async (_, assetId: string) => {
+    const books = syncer.extractBooks();
+    const book = books.find(b => b.assetId === assetId);
+
+    // 1. 获取本地已解析高亮中所有章节与数量
+    const annotations = syncer.extractAnnotations(assetId);
+    const annoChapterMap: Record<string, number> = {};
+    for (const a of annotations) {
+      const meta = vault.getAnnotationMeta(a.uuid);
+      const ch = meta?.resolvedChapter || a.chapterTitle || '默认章节';
+      annoChapterMap[ch] = (annoChapterMap[ch] || 0) + 1;
+    }
+
+    // 2. 从 EPUB 中提取完整 TOC 章节
+    let tocChapters: string[] = [];
+    if (book?.epubPath) {
+      tocChapters = epubEngine.extractTableOfContents(book.epubPath);
+    }
+
+    // 3. 组合并保持完整顺序（如果 TOC 为空，使用高亮中的章节；否则以 TOC 为准，把高亮未收录的章节补充在后）
+    const allTitles = tocChapters.length > 0 ? [...tocChapters] : Object.keys(annoChapterMap);
+    for (const ch of Object.keys(annoChapterMap)) {
+      if (ch !== '默认章节' && !allTitles.includes(ch)) {
+        allTitles.push(ch);
+      }
+    }
+
+    return allTitles.map(title => ({
+      title,
+      notesCount: annoChapterMap[title] || 0
+    }));
+  });
+
   ipcMain.handle('annotations:search', async (_, keyword: string) => {
     const all = syncer.extractAnnotations();
     const lower = keyword.toLowerCase().trim();

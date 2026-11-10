@@ -58,10 +58,16 @@ export interface DailyReviewStats {
 
 export type ReviewStats = DailyReviewStats;
 
+export interface ChapterItem {
+  title: string;
+  notesCount: number;
+}
+
 export interface BookEchoAPI {
   // 书架与高亮读取
   getBooks: () => Promise<BookItem[]>;
   getBookAnnotations: (assetId?: string) => Promise<AnnotationItem[]>;
+  getBookChapters: (assetId: string) => Promise<ChapterItem[]>;
   searchAnnotations: (keyword: string) => Promise<AnnotationItem[]>;
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) => Promise<HighlightContextResult>;
 
