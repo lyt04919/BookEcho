@@ -38,7 +38,17 @@ function initializeServices() {
 
 function registerIpcHandlers() {
   ipcMain.handle('books:getAll', async () => {
-    return syncer.extractBooks();
+    const books = syncer.extractBooks();
+    return books.map(book => {
+      let coverUrl = book.coverUrl;
+      if (!coverUrl && book.epubPath) {
+        coverUrl = epubEngine.extractCover(book.epubPath);
+      }
+      return {
+        ...book,
+        coverUrl
+      };
+    });
   });
 
   ipcMain.handle('annotations:getByBook', async (_, assetId: string) => {

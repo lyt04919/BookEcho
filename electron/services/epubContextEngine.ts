@@ -429,4 +429,77 @@ export class EpubContextEngine {
       afterParagraphs: []
     };
   }
+
+  public extractCover(epubPath: string): string | null {
+    if (!epubPath || !fs.existsSync(epubPath)) return null;
+
+    const opfPath = this.getOpfPath(epubPath);
+    if (!opfPath) return null;
+
+    const opfContent = this.readEpubFileContent(epubPath, opfPath);
+    if (!opfContent) return null;
+
+    const opfDir = path.dirname(opfPath);
+
+    try {
+      const parsed = this.parser.parse(opfContent);
+      const manifestItems = parsed?.package?.manifest?.item;
+      const items: any[] = Array.isArray(manifestItems) ? manifestItems : (manifestItems ? [manifestItems] : []);
+      const metadata = parsed?.package?.metadata;
+
+      let coverHref: string | null = null;
+
+      // 1. check properties='cover-image'
+      const propCover = items.find((i: any) => i['@_properties'] === 'cover-image');
+      if (propCover) coverHref = propCover['@_href'];
+
+      // 2. check meta name='cover'
+      if (!coverHref && metadata?.meta) {
+        const metas: any[] = Array.isArray(metadata.meta) ? metadata.meta : [metadata.meta];
+        const coverMeta = metas.find((m: any) => m['@_name'] === 'cover');
+        if (coverMeta && coverMeta['@_content']) {
+          const item = items.find((i: any) => i['@_id'] === coverMeta['@_content']);
+          if (item) coverHref = item['@_href'];
+        }
+      }
+
+      // 3. check id='cover' or id='cover-image'
+      if (!coverHref) {
+        const idCover = items.find((i: any) => /^(cover|cover-image)$/i.test(i['@_id'] || ''));
+        if (idCover) coverHref = idCover['@_href'];
+      }
+
+      // 4. check href filename matching cover
+      if (!coverHref) {
+        const hrefCover = items.find((i: any) => /cover.*\.(jpe?g|png|webp)$/i.test(i['@_href'] || ''));
+        if (hrefCover) coverHref = hrefCover['@_href'];
+      }
+
+      if (!coverHref) return null;
+
+      const normalizedRelPath = path.posix.join(opfDir, coverHref).replace(/^\//, '');
+      let imgBuf: Buffer | null = null;
+
+      if (fs.statSync(epubPath).isDirectory()) {
+        const fullPath = path.join(epubPath, normalizedRelPath);
+        if (fs.existsSync(fullPath)) {
+          imgBuf = fs.readFileSync(fullPath);
+        }
+      } else {
+        const zip = new AdmZip(epubPath);
+        const entry = zip.getEntry(normalizedRelPath);
+        if (entry) {
+          imgBuf = zip.readFile(entry);
+        }
+      }
+
+      if (!imgBuf) return null;
+
+      const ext = path.extname(coverHref).toLowerCase().replace('.', '');
+      const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+      return `data:${mime};base64,${imgBuf.toString('base64')}`;
+    } catch {
+      return null;
+    }
+  }
 }

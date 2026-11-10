@@ -23,6 +23,11 @@ export function createMockEpubDirectory(targetDir: string): string {
 
   // 2. content.opf
   fs.writeFileSync(
+    path.join(oebps, 'cover.jpg'),
+    Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+  );
+
+  fs.writeFileSync(
     path.join(oebps, 'content.opf'),
     `<?xml version="1.0" encoding="utf-8"?>
     <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
@@ -30,6 +35,7 @@ export function createMockEpubDirectory(targetDir: string): string {
         <dc:title>模拟测试书籍</dc:title>
       </metadata>
       <manifest>
+        <item id="cover-image" href="cover.jpg" properties="cover-image" media-type="image/jpeg"/>
         <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
         <item id="chapter1" href="ch01.xhtml" media-type="application/xhtml+xml"/>
       </manifest>
@@ -103,6 +109,11 @@ export function createMockEpub2WithNcx(targetDir: string): string {
   );
 
   // 2. content.opf
+  fs.writeFileSync(
+    path.join(oebps, 'cover.jpg'),
+    Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46])
+  );
+
   fs.writeFileSync(
     path.join(oebps, 'content.opf'),
     `<?xml version="1.0" encoding="utf-8"?>

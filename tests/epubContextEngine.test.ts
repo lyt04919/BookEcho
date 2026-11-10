@@ -119,4 +119,15 @@ describe('EpubContextEngine & Paragraph Context Extractor', () => {
     const chap2 = engine.resolveChapter(ncxEpubPath, 'epubcfi(/6/4[chap2]!/4/2)');
     expect(chap2.chapterTitle).toBe('第二章：启发与偏见');
   });
+
+  it('should extract cover image as data URL from directory and zip epubs', () => {
+    const coverDir = engine.extractCover(epubPath);
+    expect(coverDir).not.toBeNull();
+    expect(coverDir).toMatch(/^data:image\/jpeg;base64,/);
+
+    const zipEpubPath = createMockEpubZip(tempDir);
+    const coverZip = engine.extractCover(zipEpubPath);
+    expect(coverZip).not.toBeNull();
+    expect(coverZip).toMatch(/^data:image\/jpeg;base64,/);
+  });
 });
