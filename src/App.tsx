@@ -19,7 +19,8 @@ import { TagTopicView } from './components/TagTopicView';
 import { InsightsView } from './components/InsightsView';
 import { GlobalSearchView } from './components/GlobalSearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
-import { MessageSquareQuote, Download, Sparkles } from 'lucide-react';
+import { DEMO_BOOKS, DEMO_TAGS, DEMO_ANNOTATIONS } from './data/mockTestData';
+import { MessageSquareQuote, Download, Sparkles, X } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
@@ -53,6 +54,12 @@ export default function App() {
   const [readingChapterContent, setReadingChapterContent] = useState<ChapterContentResult | null>(null);
   const [isLoadingChapterContent, setIsLoadingChapterContent] = useState(false);
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  // 活跃数据（支持在真实库与示例测试数据间平滑切换）
+  const activeBooks = isDemoMode ? DEMO_BOOKS : books;
+  const activeTags = isDemoMode ? DEMO_TAGS : tags;
+  const activeAnnotations = isDemoMode ? DEMO_ANNOTATIONS : allAnnotations;
 
   // 跳转到知识网络图谱并聚焦指定高亮节点
   const handleOpenInGraph = (annotation: AnnotationItem) => {
@@ -137,6 +144,20 @@ export default function App() {
     setCurrentTab('books');
     setActiveChapter(null);
     setReadingChapterContent(null);
+
+    if (isDemoMode) {
+      const annos = DEMO_ANNOTATIONS.filter(a => a.assetId === book.assetId);
+      setCurrentAnnotations(annos);
+      const chs = Array.from(new Set(annos.map(a => a.chapterTitle || '默认章节')));
+      setBookChapters(
+        chs.map(title => ({
+          title,
+          notesCount: annos.filter(a => (a.chapterTitle || '默认章节') === title).length
+        }))
+      );
+      return;
+    }
+
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
         const [annos, chs] = await Promise.all([
@@ -418,14 +439,14 @@ export default function App() {
   };
 
   // 全书库中的批注与星标精华
-  const starredAndNoteAnnos = Array.isArray(allAnnotations)
-    ? allAnnotations.filter(
+  const starredAndNoteAnnos = Array.isArray(activeAnnotations)
+    ? activeAnnotations.filter(
         a => a.isStarred || Boolean(a.note?.trim() || a.customNote?.trim())
       )
     : [];
 
   const exportingBook = exportBookAssetId
-    ? books.find(b => b.assetId === exportBookAssetId) || selectedBook
+    ? activeBooks.find(b => b.assetId === exportBookAssetId) || selectedBook
     : null;
 
   return (
@@ -447,7 +468,7 @@ export default function App() {
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
         onSelectColor={setSelectedColor}
-        tags={tags}
+        tags={activeTags}
         selectedTag={selectedTag}
         onSelectTag={setSelectedTag}
         isDarkMode={isDarkMode}
@@ -458,7 +479,7 @@ export default function App() {
             loadInitialData();
           }
         }}
-        books={books}
+        books={activeBooks}
         selectedBook={selectedBook}
         onSelectBook={handleSelectBook}
         chapters={bookChapters.length > 0 ? bookChapters : currentBookChapters}
@@ -468,10 +489,42 @@ export default function App() {
         onToggleChaptersFilter={() => setOnlyChaptersWithNotes(prev => !prev)}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
+        isDemoMode={isDemoMode}
+        onToggleDemoMode={() => {
+          setIsDemoMode(prev => !prev);
+          setSelectedBook(null);
+          setSelectedTag(null);
+          setBookChapters([]);
+          setActiveChapter(null);
+          setReadingChapterContent(null);
+        }}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        {hasPermissionError ? (
+        {/* 演示测试数据专属顶部提示横幅 */}
+        {isDemoMode && (
+          <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 z-20">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+              <span>
+                <strong>正在体验精品测试数据</strong>：已预置 6 本经典书籍与 20+ 条跨书互联标签，可在「知识网络」探索交织星图。
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setIsDemoMode(false);
+                setSelectedBook(null);
+                setSelectedTag(null);
+              }}
+              className="flex items-center gap-1 font-medium hover:underline text-amber-800 dark:text-amber-200 ml-4 flex-shrink-0"
+            >
+              <span>切回原生书库</span>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {hasPermissionError && !isDemoMode ? (
           <PermissionGuide
             onSelectDir={async () => {
               if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -484,9 +537,9 @@ export default function App() {
         ) : currentTab === 'tags' || selectedTag ? (
           <TagTopicView
             tag={selectedTag}
-            tags={tags}
-            annotations={allAnnotations}
-            books={books}
+            tags={activeTags}
+            annotations={activeAnnotations}
+            books={activeBooks}
             colorSemantics={colorSemantics}
             onSelectTag={setSelectedTag}
             onCreateGlobalTag={handleCreateGlobalTag}
@@ -509,10 +562,10 @@ export default function App() {
           />
         ) : currentTab === 'graph' ? (
           <KnowledgeGraphView
-            annotations={allAnnotations}
-            books={books}
+            annotations={activeAnnotations}
+            books={activeBooks}
             colorSemantics={colorSemantics}
-            availableTags={tags}
+            availableTags={activeTags}
             onSelectBook={handleSelectBook}
             onManageTags={() => {
               setSelectedBook(null);
@@ -529,18 +582,18 @@ export default function App() {
           />
         ) : currentTab === 'insights' ? (
           <InsightsView
-            books={books}
-            annotations={allAnnotations}
+            books={activeBooks}
+            annotations={activeAnnotations}
             colorSemantics={colorSemantics}
             onSelectBook={handleSelectBook}
           />
         ) : currentTab === 'search' ? (
           <GlobalSearchView
-            books={books}
-            annotations={allAnnotations}
+            books={activeBooks}
+            annotations={activeAnnotations}
             searchResults={searchResults}
             colorSemantics={colorSemantics}
-            availableTags={tags}
+            availableTags={activeTags}
             searchKeyword={searchKeyword}
             onSearchKeywordChange={setSearchKeyword}
             onSelectBook={handleSelectBook}
@@ -573,7 +626,7 @@ export default function App() {
               {starredAndNoteAnnos.length > 0 && (
                 <button
                   onClick={() => {
-                    const firstBook = books[0];
+                    const firstBook = activeBooks[0];
                     if (firstBook) setExportBookAssetId(firstBook.assetId);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
@@ -601,7 +654,7 @@ export default function App() {
                     <div className="flex items-center justify-between text-xs text-paper-muted dark:text-night-muted px-1">
                       <span
                         onClick={() => {
-                          const matchedBook = books.find(b => b.assetId === anno.assetId);
+                          const matchedBook = activeBooks.find(b => b.assetId === anno.assetId);
                           if (matchedBook) handleSelectBook(matchedBook);
                         }}
                         className="cursor-pointer hover:text-paper-terracotta dark:hover:text-night-terracotta font-serif font-medium"
@@ -612,8 +665,8 @@ export default function App() {
                     <HighlightCard
                       annotation={anno}
                       colorSemantics={colorSemantics}
-                      availableTags={tags}
-                      allAnnotations={allAnnotations}
+                      availableTags={activeTags}
+                      allAnnotations={activeAnnotations}
                       onOpenInGraph={handleOpenInGraph}
                       onManageTags={() => {
                         setSelectedBook(null);
@@ -636,8 +689,8 @@ export default function App() {
             book={selectedBook}
             annotations={currentAnnotations}
             colorSemantics={colorSemantics}
-            availableTags={tags}
-            allAnnotations={allAnnotations}
+            availableTags={activeTags}
+            allAnnotations={activeAnnotations}
             onOpenInGraph={handleOpenInGraph}
             onManageTags={() => {
               setSelectedBook(null);

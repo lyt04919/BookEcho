@@ -12,7 +12,8 @@ import {
   List,
   BarChart3,
   ArrowLeft,
-  Waypoints
+  Waypoints,
+  Sparkles
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
@@ -40,6 +41,8 @@ export interface SidebarProps {
   onToggleChaptersFilter?: () => void;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
+  isDemoMode?: boolean;
+  onToggleDemoMode?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -59,7 +62,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onlyChaptersWithNotes = false,
   onToggleChaptersFilter,
   onRefreshData,
-  isRefreshing = false
+  isRefreshing = false,
+  isDemoMode = false,
+  onToggleDemoMode
 }) => {
   // 重点笔记书籍（划线数大于0的书籍，按笔记数倒序）
   const booksWithNotes = books
@@ -266,6 +271,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>{isRefreshing ? '正在同步数据...' : '同步最新划线'}</span>
+          </button>
+        )}
+
+        {onToggleDemoMode && (
+          <button
+            onClick={onToggleDemoMode}
+            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs transition-colors ${
+              isDemoMode
+                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium'
+                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+            title="一键加载/退出 6 本经典书籍与 20+ 条跨书互联测试数据"
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>{isDemoMode ? '切回原生数据' : '体验测试数据'}</span>
+            </span>
+            {isDemoMode && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-mono">
+                DEMO
+              </span>
+            )}
           </button>
         )}
 

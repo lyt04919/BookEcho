@@ -16,7 +16,9 @@ import {
   Filter,
   X,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Copy,
+  Check
 } from 'lucide-react';
 
 export interface GraphNode {
@@ -84,6 +86,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   const [selectedBookFilter, setSelectedBookFilter] = useState<string>('all');
   const [hideIsolated, setHideIsolated] = useState<boolean>(true); // 默认隐藏无任何连接的孤立点
   const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [graphMode, setGraphMode] = useState<'tag-hub' | 'direct-mesh'>('tag-hub');
+  const [isCopiedCluster, setIsCopiedCluster] = useState(false);
 
   // 交互选中的节点（右侧详情抽屉）
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(initialFocusedNodeId);
@@ -138,6 +142,65 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
       return (tagCountMap.get(t) || 0) > 0;
     });
 
+    if (graphMode === 'direct-mesh') {
+      // 模式 B：纯高亮对等网络（打上同一个标签的高亮之间直接连线）
+      const annoNodes: GraphNode[] = [];
+      for (const a of filteredAnnos) {
+        const matchingTags = (a.tags || []).filter(
+          t => selectedTagFilter === 'all' || t === selectedTagFilter
+        );
+        if (hideIsolated && matchingTags.length === 0) continue;
+
+        const annoId = `anno:${a.uuid}`;
+        const hex = colorMap.get(a.colorKey) || '#F5A623';
+        const b = bookMap.get(a.assetId);
+
+        const annoNode: GraphNode = {
+          id: annoId,
+          type: 'highlight',
+          label: a.selectedText.length > 20 ? a.selectedText.slice(0, 20) + '...' : a.selectedText,
+          subLabel: `《${b?.title || a.bookTitle || '未知书名'}》`,
+          color: hex,
+          radius: a.isStarred ? 10 : 8,
+          annotation: a,
+          book: b,
+          degree: 0,
+          x: (Math.random() - 0.5) * 600,
+          y: (Math.random() - 0.5) * 600,
+          vx: 0,
+          vy: 0
+        };
+        annoNodes.push(annoNode);
+        nMap.set(annoId, annoNode);
+      }
+
+      // 两两检测共同标签并建立直接引力连线
+      for (let i = 0; i < annoNodes.length; i++) {
+        for (let j = i + 1; j < annoNodes.length; j++) {
+          const n1 = annoNodes[i];
+          const n2 = annoNodes[j];
+          const tags1 = n1.annotation?.tags || [];
+          const tags2 = new Set(n2.annotation?.tags || []);
+          const shared = tags1.filter(t => tags2.has(t));
+
+          if (shared.length > 0) {
+            lList.push({
+              source: n1.id,
+              target: n2.id,
+              color: n1.color
+            });
+            n1.degree += shared.length;
+            n2.degree += shared.length;
+          }
+        }
+      }
+
+      // 若 hideIsolated，过滤掉 degree === 0 的孤立点
+      const finalNodes = hideIsolated ? annoNodes.filter(n => n.degree > 0) : annoNodes;
+      return { nodes: finalNodes, links: lList, nodeMap: nMap };
+    }
+
+    // 模式 A：标签星团拓扑（Tag Hubs）
     // 添加标签节点（Tag Hubs）
     for (const t of validTags) {
       const count = tagCountMap.get(t) || 0;
@@ -213,6 +276,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     selectedBookFilter,
     hideIsolated,
     searchKeyword,
+    graphMode,
     colorMap,
     bookMap
   ]);
@@ -644,6 +708,35 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     setZoomLevel(100);
   };
 
+  // 复制当前网络簇的所有相连高亮为 Markdown
+  const handleCopyClusterMarkdown = async () => {
+    if (!focusedNode || connectedAnnotations.length === 0) return;
+    const lines = [
+      `# 知识网络汇聚 · ${focusedNode.label}`,
+      `> 关联思考节点数量：${connectedAnnotations.length} 条\n`
+    ];
+
+    for (const a of connectedAnnotations) {
+      const b = bookMap.get(a.assetId);
+      lines.push(`> [!quote] 《${b?.title || a.bookTitle || '未知书籍'}》· ${a.chapterTitle || '默认章节'}`);
+      lines.push(`> “${a.selectedText}”`);
+      if (a.note) lines.push(`> 原文划线想法：${a.note}`);
+      if (a.customNote) lines.push(`> 延伸深度思考：${a.customNote}`);
+      if (a.tags && a.tags.length > 0) lines.push(`> 标签：${a.tags.map(t => `#${t}`).join(' ')}`);
+      lines.push('');
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(lines.join('\n'));
+      }
+      setIsCopiedCluster(true);
+      setTimeout(() => setIsCopiedCluster(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy cluster Markdown', err);
+    }
+  };
+
   // 7. 计算当前聚焦节点关联的所有高亮卡片（供右侧抽屉展示）
   const connectedAnnotations = useMemo(() => {
     if (!focusedNodeId) return [];
@@ -731,6 +824,32 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
             ))}
           </select>
 
+          {/* 拓扑模式切换 */}
+          <div className="flex items-center rounded-lg border border-paper-border dark:border-night-border overflow-hidden bg-paper-card dark:bg-night-card p-0.5">
+            <button
+              onClick={() => setGraphMode('tag-hub')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                graphMode === 'tag-hub'
+                  ? 'bg-paper-terracotta dark:bg-night-terracotta text-white shadow-2xs'
+                  : 'text-paper-muted hover:text-paper-text'
+              }`}
+              title="标签星团模式：以标签为核心引力场"
+            >
+              标签星团
+            </button>
+            <button
+              onClick={() => setGraphMode('direct-mesh')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                graphMode === 'direct-mesh'
+                  ? 'bg-paper-terracotta dark:bg-night-terracotta text-white shadow-2xs'
+                  : 'text-paper-muted hover:text-paper-text'
+              }`}
+              title="高亮对等网络：同标签笔记之间直接连线"
+            >
+              高亮直连
+            </button>
+          </div>
+
           {/* 隐藏孤立点开关 */}
           <button
             onClick={() => setHideIsolated(prev => !prev)}
@@ -789,6 +908,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onClick={handleClick}
+          onDoubleClick={handleResetZoom}
           onWheel={handleWheel}
           className="w-full h-full block"
         />
@@ -883,13 +1003,30 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
               )}
             </div>
 
-            <button
-              onClick={() => setFocusedNodeId(null)}
-              className="p-1 rounded-lg text-paper-muted hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              aria-label="关闭网络抽屉"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {connectedAnnotations.length > 0 && (
+                <button
+                  onClick={handleCopyClusterMarkdown}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                    isCopiedCluster
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'
+                      : 'border-paper-border dark:border-night-border hover:border-paper-terracotta text-paper-muted hover:text-paper-text'
+                  }`}
+                  title="一键复制本簇所有高亮为 Markdown 引用"
+                >
+                  {isCopiedCluster ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{isCopiedCluster ? '已复制' : '复制本簇'}</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setFocusedNodeId(null)}
+                className="p-1 rounded-lg text-paper-muted hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                aria-label="关闭网络抽屉"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* 抽屉相连列表 */}

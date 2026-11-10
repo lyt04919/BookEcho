@@ -177,7 +177,10 @@ describe('App State and Orchestration', () => {
     try {
       const element = App() as ReactElement<any>;
       const main = element.props.children[1];
-      const searchView = main.props.children;
+      const mainChildren = Array.isArray(main.props.children)
+        ? main.props.children.filter(Boolean)
+        : [main.props.children];
+      const searchView = mainChildren[mainChildren.length - 1];
 
       expect(searchView.props.onSelectBook).toBeDefined();
       searchView.props.onSelectBook(mockBooks[0]);

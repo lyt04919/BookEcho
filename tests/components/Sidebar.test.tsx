@@ -182,7 +182,8 @@ describe('Sidebar Component', () => {
     expect(onSelectTab).toHaveBeenCalledWith('graph');
 
     // 底部系统操作
-    const [refreshBtn, customDirBtn, darkModeBtn] = bottomDiv.props.children;
+    const bottomBtns = bottomDiv.props.children.filter(Boolean);
+    const [refreshBtn, customDirBtn, darkModeBtn] = bottomBtns;
     refreshBtn.props.onClick();
     expect(onRefreshData).toHaveBeenCalled();
 
