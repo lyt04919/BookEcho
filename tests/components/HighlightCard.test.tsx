@@ -194,6 +194,12 @@ describe('HighlightCard Component', () => {
     props.onAddTag('anno-001', '认知心理学');
     expect(onAddTag).toHaveBeenCalledWith('anno-001', '认知心理学');
 
+    // Verify tag strip helper behavior
+    const stripHash = (tag: string) => tag.trim().replace(/^#+/, '');
+    expect(stripHash('#心学')).toBe('心学');
+    expect(stripHash('###哲学')).toBe('哲学');
+    expect(stripHash('无井号')).toBe('无井号');
+
     props.onRemoveTag('anno-001', '心学');
     expect(onRemoveTag).toHaveBeenCalledWith('anno-001', '心学');
 

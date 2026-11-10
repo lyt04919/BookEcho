@@ -35,25 +35,34 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   const colorHex = semantic?.hexColor || '#F5A623';
 
   const handleToggleContext = async () => {
-    if (!isContextOpen && !contextData) {
-      setIsLoadingContext(true);
-      try {
-        const res = await onRequestContext(annotation);
-        setContextData(res);
-      } catch (err) {
-        setContextData({
-          available: false,
-          reason: 'NOT_FOUND',
-          beforeParagraphs: [],
-          currentParagraph: '',
-          selectedText: annotation.selectedText,
-          afterParagraphs: []
-        });
-      } finally {
-        setIsLoadingContext(false);
+    if (!isContextOpen) {
+      setIsContextOpen(true);
+      if (!contextData) {
+        setIsLoadingContext(true);
+        try {
+          const res = await onRequestContext(annotation);
+          setContextData(res);
+        } catch {
+          setContextData({
+            available: false,
+            reason: 'NOT_FOUND',
+            beforeParagraphs: [],
+            currentParagraph: '',
+            selectedText: annotation.selectedText,
+            afterParagraphs: []
+          });
+        } finally {
+          setIsLoadingContext(false);
+        }
       }
+    } else {
+      setIsContextOpen(false);
     }
-    setIsContextOpen(!isContextOpen);
+  };
+
+  const handleStartEditNote = () => {
+    setNoteText(annotation.customNote || '');
+    setIsEditingNote(true);
   };
 
   const handleSaveNote = () => {
@@ -67,9 +76,9 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   };
 
   const handleAddTag = () => {
-    const trimmed = newTagText.trim();
-    if (trimmed) {
-      onAddTag(annotation.uuid, trimmed);
+    const cleaned = newTagText.trim().replace(/^#+/, '');
+    if (cleaned) {
+      onAddTag(annotation.uuid, cleaned);
       setNewTagText('');
       setIsTagInputOpen(false);
     }
@@ -163,11 +172,11 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           </div>
         ) : annotation.customNote ? (
           <div
-            onClick={() => setIsEditingNote(true)}
+            onClick={handleStartEditNote}
             className="cursor-pointer group flex items-start gap-1.5 text-xs text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text"
             role="button"
             tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsEditingNote(true); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleStartEditNote(); }}
             aria-label="编辑深度想法"
           >
             <MessageSquare className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta mt-0.5 flex-shrink-0" />
@@ -175,7 +184,7 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           </div>
         ) : (
           <button
-            onClick={() => setIsEditingNote(true)}
+            onClick={handleStartEditNote}
             className="flex items-center gap-1 text-[11px] text-paper-muted/70 dark:text-night-muted/70 hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors"
           >
             <Plus className="w-3 h-3" />
