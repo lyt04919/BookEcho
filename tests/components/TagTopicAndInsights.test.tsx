@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TagTopicView, formatTagTopicMarkdown } from '../../src/components/TagTopicView';
 import { InsightsView } from '../../src/components/InsightsView';
+import { GlobalSearchView } from '../../src/components/GlobalSearchView';
 import { BookItem, AnnotationItem, ColorSemanticConfig } from '../../electron/types/ipc';
 
 const mockColorSemantics: ColorSemanticConfig[] = [
@@ -136,5 +137,56 @@ describe('InsightsView Component', () => {
     expect(html).toContain('高亮色彩语义分布');
     expect(html).toContain('核心论点');
     expect(html).toContain('概念与背景');
+  });
+});
+
+describe('GlobalSearchView Component', () => {
+  it('should render discovery stream when searchKeyword is empty and filter by keyword when entered', () => {
+    const discoveryHtml = renderToStaticMarkup(
+      <GlobalSearchView
+        books={mockBooks}
+        annotations={mockAnnotations}
+        colorSemantics={mockColorSemantics}
+        availableTags={['心智模型', '财富']}
+        searchKeyword=""
+        onSearchKeywordChange={vi.fn()}
+        onSelectBook={vi.fn()}
+        onManageTags={vi.fn()}
+        onToggleStar={vi.fn()}
+        onUpdateCustomNote={vi.fn()}
+        onAddTag={vi.fn()}
+        onRemoveTag={vi.fn()}
+        onOpenQuoteModal={vi.fn()}
+        onRequestContext={vi.fn()}
+      />
+    );
+
+    expect(discoveryHtml).toContain('全局探索与检索');
+    expect(discoveryHtml).toContain('探索流：最近记录的');
+    expect(discoveryHtml).toContain('追求财富，而不是追求金钱或地位。');
+    expect(discoveryHtml).toContain('反过来想，总是反过来想。');
+
+    const filteredHtml = renderToStaticMarkup(
+      <GlobalSearchView
+        books={mockBooks}
+        annotations={mockAnnotations}
+        colorSemantics={mockColorSemantics}
+        availableTags={['心智模型', '财富']}
+        searchKeyword="穷查理"
+        onSearchKeywordChange={vi.fn()}
+        onSelectBook={vi.fn()}
+        onManageTags={vi.fn()}
+        onToggleStar={vi.fn()}
+        onUpdateCustomNote={vi.fn()}
+        onAddTag={vi.fn()}
+        onRemoveTag={vi.fn()}
+        onOpenQuoteModal={vi.fn()}
+        onRequestContext={vi.fn()}
+      />
+    );
+
+    expect(filteredHtml).toContain('共检索到');
+    expect(filteredHtml).toContain('反过来想，总是反过来想。');
+    expect(filteredHtml).not.toContain('追求财富，而不是追求金钱或地位。');
   });
 });

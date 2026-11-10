@@ -143,10 +143,16 @@ function registerIpcHandlers() {
     const lower = keyword.toLowerCase().trim();
     if (!lower) return [];
 
+    const books = syncer.extractBooks();
+    const bookMap = new Map(books.map(b => [b.assetId, b]));
+
     const result: AnnotationItem[] = [];
     for (const item of all) {
       const meta = vault.getAnnotationMeta(item.uuid);
       const tags = vault.getTagsForAnnotation(item.uuid);
+      const book = bookMap.get(item.assetId);
+      const bookTitle = book?.title || '未知书籍';
+      const chapterTitle = meta?.resolvedChapter || item.chapterTitle || '默认章节';
       const customNote = meta?.customNote || '';
       const isStarred = meta?.isStarred || false;
 
@@ -154,10 +160,14 @@ function registerIpcHandlers() {
       const matchesNote = Boolean(item.note && item.note.toLowerCase().includes(lower));
       const matchesCustomNote = customNote.toLowerCase().includes(lower);
       const matchesTags = tags.some(t => t.toLowerCase().includes(lower));
+      const matchesBook = bookTitle.toLowerCase().includes(lower);
+      const matchesChapter = chapterTitle.toLowerCase().includes(lower);
 
-      if (matchesSelected || matchesNote || matchesCustomNote || matchesTags) {
+      if (matchesSelected || matchesNote || matchesCustomNote || matchesTags || matchesBook || matchesChapter) {
         result.push({
           ...item,
+          bookTitle,
+          chapterTitle,
           customNote,
           isStarred,
           tags

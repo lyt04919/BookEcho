@@ -15,6 +15,7 @@ describe('App Build Artifact Integrity', () => {
       'src/components/BookDetailView.tsx',
       'src/components/HighlightCard.tsx',
       'src/components/DailyReviewView.tsx',
+      'src/components/GlobalSearchView.tsx',
       'src/components/QuoteCardModal.tsx',
       'src/components/ExportModal.tsx',
       'src/components/PermissionGuide.tsx'
@@ -130,7 +131,7 @@ describe('App State and Orchestration', () => {
       const html = renderToStaticMarkup(element);
       expect(html).toContain('搜索高亮句子、想法或批注...');
       expect(html).toContain('致富不是靠运气，而是靠技能。');
-      expect(html).toContain('划线批注: 关键观点');
+      expect(html).toContain('关键观点');
     } finally {
       dispatcher.current = prevDispatcher;
     }
@@ -176,12 +177,10 @@ describe('App State and Orchestration', () => {
     try {
       const element = App() as ReactElement<any>;
       const main = element.props.children[1];
-      const searchContainer = main.props.children;
-      const resultList = searchContainer.props.children[1];
-      const resultCard = resultList.props.children[0][0];
+      const searchView = main.props.children;
 
-      expect(resultCard.props.onClick).toBeDefined();
-      resultCard.props.onClick();
+      expect(searchView.props.onSelectBook).toBeDefined();
+      searchView.props.onSelectBook(mockBooks[0]);
       expect(setSelectedBookMock).toHaveBeenCalledWith(mockBooks[0]);
       expect(setTabMock).toHaveBeenCalledWith('books');
     } finally {

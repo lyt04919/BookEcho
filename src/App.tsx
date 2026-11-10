@@ -18,7 +18,8 @@ import { PermissionGuide } from './components/PermissionGuide';
 import { HighlightCard } from './components/HighlightCard';
 import { TagTopicView } from './components/TagTopicView';
 import { InsightsView } from './components/InsightsView';
-import { Search, MessageSquareQuote, Download, Sparkles } from 'lucide-react';
+import { GlobalSearchView } from './components/GlobalSearchView';
+import { MessageSquareQuote, Download, Sparkles } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
@@ -219,13 +220,19 @@ export default function App() {
 
   // 更新星标
   const handleToggleStar = async (uuid: string) => {
-    const item = currentAnnotations.find(a => a.uuid === uuid) || allAnnotations.find(a => a.uuid === uuid);
+    const item =
+      currentAnnotations.find(a => a.uuid === uuid) ||
+      allAnnotations.find(a => a.uuid === uuid) ||
+      reviewQueue.find(a => a.uuid === uuid);
     if (!item) return;
     const nextStarred = !item.isStarred;
     setCurrentAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
     setAllAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
+    );
+    setReviewQueue(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -243,6 +250,9 @@ export default function App() {
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
     setAllAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
+    );
+    setReviewQueue(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -274,6 +284,15 @@ export default function App() {
         return a;
       })
     );
+    setReviewQueue(prev =>
+      prev.map(a => {
+        if (a.uuid === uuid) {
+          const prevTags = a.tags || [];
+          return prevTags.includes(tag) ? a : { ...a, tags: [...prevTags, tag] };
+        }
+        return a;
+      })
+    );
     setTags(prev => (prev.includes(tag) ? prev : [...prev, tag]));
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -291,6 +310,9 @@ export default function App() {
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
     setAllAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
+    );
+    setReviewQueue(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -338,6 +360,12 @@ export default function App() {
         tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
       }))
     );
+    setReviewQueue(prev =>
+      prev.map(a => ({
+        ...a,
+        tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
+      }))
+    );
     if (selectedTag === cleanOld) {
       setSelectedTag(cleanNew);
     }
@@ -362,6 +390,9 @@ export default function App() {
       prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
     );
     setAllAnnotations(prev =>
+      prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
+    );
+    setReviewQueue(prev =>
       prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
     );
     if (selectedTag === clean) {
@@ -515,57 +546,50 @@ export default function App() {
             onSelectBook={handleSelectBook}
           />
         ) : currentTab === 'search' ? (
-          <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
-            <div className="relative mb-6 max-w-xl">
-              <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-paper-muted dark:text-night-muted" />
-              <input
-                type="text"
-                value={searchKeyword}
-                onChange={e => setSearchKeyword(e.target.value)}
-                placeholder="搜索高亮句子、想法或批注..."
-                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text placeholder:text-paper-muted dark:placeholder:text-night-muted focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta"
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-4 max-w-3xl">
-              {searchResults.map(res => (
-                <div
-                  key={res.uuid}
-                  onClick={() => {
-                    const matchedBook = books.find(b => b.assetId === res.assetId);
-                    if (matchedBook) {
-                      handleSelectBook(matchedBook);
-                    }
-                    setCurrentTab('books');
-                  }}
-                  className="p-4 rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card shadow-sm cursor-pointer hover:border-paper-terracotta/60 dark:hover:border-night-terracotta/60 hover:shadow-md transition-all"
-                >
-                  <p className="font-serif text-sm leading-relaxed mb-2 text-paper-text dark:text-night-text">
-                    “{res.selectedText}”
-                  </p>
-                  {res.note && (
-                    <p className="text-xs text-paper-muted dark:text-night-muted">
-                      划线批注: {res.note}
-                    </p>
-                  )}
-                </div>
-              ))}
-              {searchKeyword.trim() && searchResults.length === 0 && (
-                <p className="text-xs text-paper-muted dark:text-night-muted">未找到匹配的高亮或批注</p>
-              )}
-            </div>
-          </div>
+          <GlobalSearchView
+            books={books}
+            annotations={allAnnotations}
+            searchResults={searchResults}
+            colorSemantics={colorSemantics}
+            availableTags={tags}
+            searchKeyword={searchKeyword}
+            onSearchKeywordChange={setSearchKeyword}
+            onSelectBook={handleSelectBook}
+            onManageTags={() => {
+              setSelectedBook(null);
+              setCurrentTab('tags');
+            }}
+            onToggleStar={handleToggleStar}
+            onUpdateCustomNote={handleUpdateCustomNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
+            onRequestContext={handleRequestContext}
+          />
         ) : currentTab === 'review' ? (
           <DailyReviewView
             queue={reviewQueue}
+            allAnnotations={allAnnotations}
+            books={books}
             colorSemantics={colorSemantics}
+            availableTags={tags}
             onSubmitResult={async (uuid, res) => {
               if (typeof window !== 'undefined' && window.bookEchoAPI) {
                 await window.bookEchoAPI.submitReviewResult(uuid, res);
               }
             }}
             onRefreshQueue={loadReviewQueue}
+            onSelectBook={handleSelectBook}
+            onToggleStar={handleToggleStar}
+            onUpdateCustomNote={handleUpdateCustomNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
+            onRequestContext={handleRequestContext}
+            onManageTags={() => {
+              setSelectedBook(null);
+              setCurrentTab('tags');
+            }}
           />
         ) : currentTab === 'starred_notes' ? (
           /* 批注与星标独立专属汇总馆 */
