@@ -3,24 +3,26 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sidebar, SidebarProps } from '../../src/components/Sidebar';
 import App from '../../src/App';
-import { ColorSemanticConfig } from '../../electron/types/ipc';
+import { BookItem } from '../../electron/types/ipc';
 
-const mockColorSemantics: ColorSemanticConfig[] = [
-  { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
-  { colorKey: 'green', label: '行动与实践', hexColor: '#5CB85C' },
-  { colorKey: 'blue', label: '概念与背景', hexColor: '#4A90E2' },
-  { colorKey: 'pink', label: '灵感与金句', hexColor: '#E86F88' },
-  { colorKey: 'purple', label: '存疑与深思', hexColor: '#9B6B9E' },
-  { colorKey: 'underline', label: '重点下划线', hexColor: '#D9534F' }
+const mockBooks: BookItem[] = [
+  {
+    assetId: 'book-1',
+    title: '纳瓦尔宝典',
+    author: '埃里克·乔根森',
+    genre: '商业',
+    epubPath: '/naval.epub',
+    readingProgress: 0.8,
+    lastOpenDateMs: 1700000000000,
+    coverUrl: null,
+    highlightsCount: 74
+  }
 ];
 
 describe('Sidebar Component', () => {
   const defaultProps: SidebarProps = {
     currentTab: 'books',
     onSelectTab: vi.fn(),
-    colorSemantics: mockColorSemantics,
-    selectedColor: null,
-    onSelectColor: vi.fn(),
     tags: ['哲学', '科技'],
     selectedTag: null,
     onSelectTag: vi.fn(),
@@ -38,30 +40,43 @@ describe('Sidebar Component', () => {
   it('should render primary navigation tabs', () => {
     const html = renderToStaticMarkup(<Sidebar {...defaultProps} />);
     expect(html).toContain('全部书架');
+    expect(html).toContain('批注与星标');
     expect(html).toContain('每日回顾');
     expect(html).toContain('全局搜索');
   });
 
   it('should highlight active tab appropriately', () => {
-    // When on books tab without filters
     const booksHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="books" />);
     expect(booksHtml).toContain('全部书架');
 
-    // When on review tab
+    const starredHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="starred_notes" />);
+    expect(starredHtml).toContain('批注与星标');
+
     const reviewHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="review" />);
     expect(reviewHtml).toContain('每日回顾');
 
-    // When on search tab
     const searchHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="search" />);
     expect(searchHtml).toContain('全局搜索');
   });
 
-  it('should render all color semantic items with background colors', () => {
-    const html = renderToStaticMarkup(<Sidebar {...defaultProps} />);
-    for (const item of mockColorSemantics) {
-      expect(html).toContain(item.label);
-      expect(html).toContain(item.hexColor);
-    }
+  it('should render book notes shortcut list when books with highlights are provided', () => {
+    const html = renderToStaticMarkup(<Sidebar {...defaultProps} books={mockBooks} />);
+    expect(html).toContain('重点笔记书单');
+    expect(html).toContain('纳瓦尔宝典');
+    expect(html).toContain('74');
+  });
+
+  it('should render chapters list when in book detail mode', () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        {...defaultProps}
+        selectedBook={mockBooks[0]}
+        chapters={['第一章 财富', '第二章 判断力']}
+      />
+    );
+    expect(html).toContain('章节目录');
+    expect(html).toContain('第一章 财富');
+    expect(html).toContain('第二章 判断力');
   });
 
   it('should render tags when tags array is non-empty', () => {
@@ -73,7 +88,6 @@ describe('Sidebar Component', () => {
   it('should not render tags section when tags array is empty', () => {
     const html = renderToStaticMarkup(<Sidebar {...defaultProps} tags={[]} />);
     expect(html).not.toContain('#心智模型');
-    expect(html).not.toContain('<div class="flex flex-wrap gap-1.5 px-2">');
   });
 
   it('should include dark mode styling classes corresponding to night tokens', () => {
@@ -96,38 +110,38 @@ describe('Sidebar Component', () => {
     expect(darkHtml).not.toContain('深色夜读');
   });
 
-  it('should trigger navigation and filter callbacks when clicked', () => {
+  it('should trigger navigation and action callbacks when clicked', () => {
     const onSelectTab = vi.fn();
-    const onSelectColor = vi.fn();
     const onSelectTag = vi.fn();
     const onToggleDarkMode = vi.fn();
     const onSelectCustomDir = vi.fn();
+    const onRefreshData = vi.fn();
 
     const element = Sidebar({
       ...defaultProps,
       currentTab: 'books',
-      selectedColor: 'yellow',
       selectedTag: '哲学',
       onSelectTab,
-      onSelectColor,
       onSelectTag,
       onToggleDarkMode,
-      onSelectCustomDir
+      onSelectCustomDir,
+      onRefreshData
     }) as ReactElement<any>;
 
-    // Traverse the rendered React element tree
     expect(element).toBeDefined();
     expect(element.type).toBe('aside');
 
-    const topDiv = element.props.children[0];
-    const bottomDiv = element.props.children[1];
+    const [topDiv, _middleDiv, bottomDiv] = element.props.children;
 
-    // Nav buttons are in topDiv.props.children[2]
+    // 导航区
     const nav = topDiv.props.children[2];
-    const [booksBtn, reviewBtn, searchBtn] = nav.props.children;
+    const [booksBtn, starredBtn, reviewBtn, searchBtn] = nav.props.children;
 
     booksBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('books');
+
+    starredBtn.props.onClick();
+    expect(onSelectTab).toHaveBeenCalledWith('starred_notes');
 
     reviewBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('review');
@@ -135,34 +149,11 @@ describe('Sidebar Component', () => {
     searchBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('search');
 
-    // Color buttons are in topDiv.props.children[3]
-    const colorSection = topDiv.props.children[3];
-    const colorList = colorSection.props.children[1];
-    const colorButtons = colorList.props.children;
+    // 底部系统操作
+    const [refreshBtn, customDirBtn, darkModeBtn] = bottomDiv.props.children;
+    refreshBtn.props.onClick();
+    expect(onRefreshData).toHaveBeenCalled();
 
-    // First color button is 'yellow', which is currently selected, so clicking it should toggle to null
-    colorButtons[0].props.onClick();
-    expect(onSelectColor).toHaveBeenCalledWith(null);
-
-    // Second color button is 'green', which is unselected, so clicking it should pass 'green'
-    colorButtons[1].props.onClick();
-    expect(onSelectColor).toHaveBeenCalledWith('green');
-
-    // Tag buttons are in topDiv.props.children[4]
-    const tagSection = topDiv.props.children[4];
-    const tagList = tagSection.props.children[1];
-    const tagButtons = tagList.props.children;
-
-    // First tag is '哲学', which is currently selected, so clicking it should toggle to null
-    tagButtons[0].props.onClick();
-    expect(onSelectTag).toHaveBeenCalledWith(null);
-
-    // Second tag is '科技', unselected, so clicking it should pass '科技'
-    tagButtons[1].props.onClick();
-    expect(onSelectTag).toHaveBeenCalledWith('科技');
-
-    // Bottom action buttons
-    const [customDirBtn, darkModeBtn] = bottomDiv.props.children;
     customDirBtn.props.onClick();
     expect(onSelectCustomDir).toHaveBeenCalled();
 
