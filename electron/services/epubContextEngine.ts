@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { XMLParser } from 'fast-xml-parser';
-import { HighlightContextResult } from '../types/ipc';
+import { HighlightContextResult, ChapterContentResult } from '../types/ipc';
 
 interface SpineItem {
   id: string;
@@ -603,5 +603,155 @@ export class EpubContextEngine {
     }
 
     return titles;
+  }
+
+  public extractChapterContent(epubPath: string, chapterTitle: string): ChapterContentResult {
+    const targetTitle = (chapterTitle || '').trim();
+    if (!epubPath || !fs.existsSync(epubPath) || !targetTitle) {
+      return { available: false, chapterTitle: targetTitle, paragraphs: [] };
+    }
+
+    const opfPath = this.getOpfPath(epubPath);
+    if (!opfPath) {
+      return { available: false, chapterTitle: targetTitle, paragraphs: [] };
+    }
+
+    const { opfDir, spine, tocHref } = this.parseSpineAndManifest(epubPath, opfPath);
+    const tocDir = tocHref
+      ? path.posix.dirname(path.posix.join(opfDir === '.' ? '' : opfDir, tocHref.split('#')[0].split('?')[0]))
+      : opfDir;
+
+    let matchedHref: string | null = null;
+
+    // 1. 尝试从 TOC 中根据章节名定位对应的 HTML href
+    if (tocHref) {
+      const cleanTocHref = tocHref.split('#')[0].split('?')[0];
+      const tocFullPath = path.posix.join(opfDir === '.' ? '' : opfDir, cleanTocHref);
+      const tocContent = this.readEpubFileContent(epubPath, tocFullPath);
+
+      if (tocContent) {
+        if (tocContent.includes('<navMap>') || cleanTocHref.endsWith('.ncx')) {
+          try {
+            const parsed = this.parser.parse(tocContent);
+            const findHrefInNav = (node: any): string | null => {
+              if (!node) return null;
+              if (Array.isArray(node)) {
+                for (const item of node) {
+                  const found = findHrefInNav(item);
+                  if (found) return found;
+                }
+                return null;
+              }
+              if (typeof node === 'object') {
+                const rawText = node?.navLabel?.text;
+                const label =
+                  typeof rawText === 'string'
+                    ? rawText.trim()
+                    : rawText && typeof rawText === 'object' && rawText['#text']
+                    ? String(rawText['#text']).trim()
+                    : '';
+                if (label && (label === targetTitle || label.includes(targetTitle) || targetTitle.includes(label))) {
+                  const src = node?.content?.['@_src'];
+                  if (src) return String(src).split('#')[0].split('?')[0];
+                }
+                if (node.navPoint) {
+                  const found = findHrefInNav(node.navPoint);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            const navMap = parsed?.ncx?.navMap;
+            if (navMap) {
+              matchedHref = findHrefInNav(navMap.navPoint);
+            }
+          } catch {
+            // ignore xml parse errors
+          }
+        } else {
+          // EPUB 3 HTML nav
+          const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+          let match;
+          while ((match = linkRegex.exec(tocContent)) !== null) {
+            const href = match[1].split('#')[0].split('?')[0];
+            const label = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            if (label && (label === targetTitle || label.includes(targetTitle) || targetTitle.includes(label))) {
+              matchedHref = href;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    const readParagraphsFromHref = (href: string, baseDir: string): string[] => {
+      const cleanHref = href.split('#')[0].split('?')[0];
+      const candidates = [
+        path.posix.join(baseDir === '.' ? '' : baseDir, cleanHref),
+        path.posix.join(opfDir === '.' ? '' : opfDir, cleanHref),
+        cleanHref
+      ];
+      for (const candidate of candidates) {
+        const html = this.readEpubFileContent(epubPath, candidate);
+        if (html) {
+          const paras = this.extractHtmlParagraphs(html);
+          if (paras.length > 0) return paras;
+        }
+      }
+      return [];
+    };
+
+    if (matchedHref) {
+      const paras = readParagraphsFromHref(matchedHref, tocDir);
+      if (paras.length > 0) {
+        return { available: true, chapterTitle: targetTitle, paragraphs: paras };
+      }
+    }
+
+    // 2. 兜底：遍历 spine 中各章节 HTML，匹配标题或索引
+    const sectionIdxMatch = targetTitle.match(/^第\s*(\d+)\s*节$/);
+    if (sectionIdxMatch) {
+      const idx = parseInt(sectionIdxMatch[1], 10) - 1;
+      if (spine[idx]) {
+        const paras = readParagraphsFromHref(spine[idx].href, opfDir);
+        if (paras.length > 0) {
+          return { available: true, chapterTitle: targetTitle, paragraphs: paras };
+        }
+      }
+    }
+
+    for (const item of spine) {
+      const cleanHref = item.href.split('#')[0].split('?')[0];
+      const fullHref = path.posix.join(opfDir === '.' ? '' : opfDir, cleanHref);
+      const html = this.readEpubFileContent(epubPath, fullHref);
+      if (!html) continue;
+
+      const hMatch = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i.exec(html);
+      const hTitle = hMatch ? hMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+      const tMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+      const docTitle = tMatch ? tMatch[1].trim() : '';
+
+      if (
+        (hTitle && (hTitle === targetTitle || hTitle.includes(targetTitle) || targetTitle.includes(hTitle))) ||
+        (docTitle && (docTitle === targetTitle || docTitle.includes(targetTitle)))
+      ) {
+        const paras = this.extractHtmlParagraphs(html);
+        if (paras.length > 0) {
+          return { available: true, chapterTitle: targetTitle, paragraphs: paras };
+        }
+      }
+    }
+
+    // 3. 终极兜底：如果目录位置与 spine 对应
+    const tocList = this.extractTableOfContents(epubPath);
+    const tocIdx = tocList.indexOf(targetTitle);
+    if (tocIdx >= 0 && spine[tocIdx]) {
+      const paras = readParagraphsFromHref(spine[tocIdx].href, opfDir);
+      if (paras.length > 0) {
+        return { available: true, chapterTitle: targetTitle, paragraphs: paras };
+      }
+    }
+
+    return { available: false, chapterTitle: targetTitle, paragraphs: [] };
   }
 }

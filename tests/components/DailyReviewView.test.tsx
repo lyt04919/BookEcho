@@ -401,5 +401,25 @@ describe('DailyReviewView Component', () => {
       expect(currentIndex >= queue.length).toBe(true);
       expect(onSubmitResult).toHaveBeenCalledTimes(3);
     });
+
+    it('should blur quote text when initialClozeMode is true and trigger reveal on Tab when callback provided', () => {
+      const props = createDefaultProps({ initialClozeMode: true });
+      const html = renderToStaticMarkup(<DailyReviewView {...props} />);
+      expect(html).toContain('blur-sm');
+      expect(html).toContain('主动回忆中');
+
+      const onAction = vi.fn();
+      const onToggleReveal = vi.fn();
+      const preventDefault = vi.fn();
+      const handled = handleReviewKeyDown(
+        { key: 'Tab', preventDefault },
+        mockReviewQueue[0],
+        onAction,
+        onToggleReveal
+      );
+      expect(handled).toBe(true);
+      expect(preventDefault).toHaveBeenCalled();
+      expect(onToggleReveal).toHaveBeenCalledTimes(1);
+    });
   });
 });

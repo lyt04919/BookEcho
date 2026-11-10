@@ -5,9 +5,10 @@ import {
   ColorSemanticConfig,
   HighlightColor,
   HighlightContextResult,
-  ChapterItem
+  ChapterItem,
+  ChapterContentResult
 } from '../electron/types/ipc';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, NavTab } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
 import { BookDetailView } from './components/BookDetailView';
 import { DailyReviewView } from './components/DailyReviewView';
@@ -15,6 +16,8 @@ import { QuoteCardModal } from './components/QuoteCardModal';
 import { ExportModal } from './components/ExportModal';
 import { PermissionGuide } from './components/PermissionGuide';
 import { HighlightCard } from './components/HighlightCard';
+import { TagTopicView } from './components/TagTopicView';
+import { InsightsView } from './components/InsightsView';
 import { Search, MessageSquareQuote, Download, Sparkles } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
@@ -27,7 +30,7 @@ const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
 ];
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'books' | 'review' | 'search' | 'starred_notes'>('books');
+  const [currentTab, setCurrentTab] = useState<NavTab>('books');
   const [books, setBooks] = useState<BookItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationItem[]>([]);
@@ -45,6 +48,10 @@ export default function App() {
   const [allAnnotations, setAllAnnotations] = useState<AnnotationItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [bookChapters, setBookChapters] = useState<ChapterItem[]>([]);
+  const [activeChapter, setActiveChapter] = useState<string | null>(null);
+  const [onlyChaptersWithNotes, setOnlyChaptersWithNotes] = useState(false);
+  const [readingChapterContent, setReadingChapterContent] = useState<ChapterContentResult | null>(null);
+  const [isLoadingChapterContent, setIsLoadingChapterContent] = useState(false);
 
   // 初始化加载数据
   const loadInitialData = async () => {
@@ -85,10 +92,42 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // 全局快捷键：Cmd/Ctrl + K 唤起全局搜索，Esc 返回
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSelectedTag(null);
+        setCurrentTab('search');
+      } else if (e.key === 'Escape') {
+        const target = e.target as { tagName?: string } | null;
+        if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+        if (activeQuoteItem || exportBookAssetId) return;
+        if (readingChapterContent) {
+          setReadingChapterContent(null);
+        } else if (selectedTag) {
+          setSelectedTag(null);
+        } else if (selectedBook) {
+          setSelectedBook(null);
+          setBookChapters([]);
+          setActiveChapter(null);
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleGlobalKeyDown);
+      return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }
+  }, [activeQuoteItem, exportBookAssetId, readingChapterContent, selectedTag, selectedBook]);
+
   // 切换单书精读
   const handleSelectBook = async (book: BookItem) => {
     setSelectedBook(book);
+    setSelectedTag(null);
     setCurrentTab('books');
+    setActiveChapter(null);
+    setReadingChapterContent(null);
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
         const [annos, chs] = await Promise.all([
@@ -105,6 +144,25 @@ export default function App() {
     } else {
       setCurrentAnnotations([]);
       setBookChapters([]);
+    }
+  };
+
+  // 加载单章完整 EPUB 原文
+  const handleReadChapter = async (chapterTitle: string) => {
+    if (!selectedBook) return;
+    setActiveChapter(chapterTitle);
+    setIsLoadingChapterContent(true);
+    try {
+      if (typeof window !== 'undefined' && window.bookEchoAPI) {
+        const res = await window.bookEchoAPI.getChapterContent(selectedBook.assetId, chapterTitle);
+        setReadingChapterContent(res);
+      } else {
+        setReadingChapterContent({ available: false, chapterTitle, paragraphs: [] });
+      }
+    } catch {
+      setReadingChapterContent({ available: false, chapterTitle, paragraphs: [] });
+    } finally {
+      setIsLoadingChapterContent(false);
     }
   };
 
@@ -280,10 +338,16 @@ export default function App() {
   );
 
   const handleSelectChapter = (chapter: string) => {
+    setActiveChapter(chapter);
     if (typeof document !== 'undefined') {
       const el = document.getElementById(`chapter-${encodeURIComponent(chapter)}`);
-      el?.scrollIntoView({ behavior: 'smooth' });
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
     }
+    // 若该章节暂无高亮卡片，直接展开阅读该章节 EPUB 原文
+    handleReadChapter(chapter);
   };
 
   // 全书库中的批注与星标精华
@@ -306,7 +370,10 @@ export default function App() {
         onSelectTab={tab => {
           setCurrentTab(tab);
           setSelectedBook(null);
+          setSelectedTag(null);
           setBookChapters([]);
+          setActiveChapter(null);
+          setReadingChapterContent(null);
         }}
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
@@ -327,6 +394,9 @@ export default function App() {
         onSelectBook={handleSelectBook}
         chapters={bookChapters.length > 0 ? bookChapters : currentBookChapters}
         onSelectChapter={handleSelectChapter}
+        activeChapter={activeChapter}
+        onlyChaptersWithNotes={onlyChaptersWithNotes}
+        onToggleChaptersFilter={() => setOnlyChaptersWithNotes(prev => !prev)}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
       />
@@ -341,6 +411,28 @@ export default function App() {
               }
             }}
             onRetry={loadInitialData}
+          />
+        ) : selectedTag ? (
+          <TagTopicView
+            tag={selectedTag}
+            annotations={allAnnotations}
+            books={books}
+            colorSemantics={colorSemantics}
+            onClearTag={() => setSelectedTag(null)}
+            onSelectBook={handleSelectBook}
+            onToggleStar={handleToggleStar}
+            onUpdateCustomNote={handleUpdateCustomNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
+            onRequestContext={handleRequestContext}
+          />
+        ) : currentTab === 'insights' ? (
+          <InsightsView
+            books={books}
+            annotations={allAnnotations}
+            colorSemantics={colorSemantics}
+            onSelectBook={handleSelectBook}
           />
         ) : currentTab === 'search' ? (
           <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
@@ -468,7 +560,12 @@ export default function App() {
             book={selectedBook}
             annotations={currentAnnotations}
             colorSemantics={colorSemantics}
-            onBack={() => setSelectedBook(null)}
+            onBack={() => {
+              setSelectedBook(null);
+              setBookChapters([]);
+              setActiveChapter(null);
+              setReadingChapterContent(null);
+            }}
             onOpenInAppleBooks={(id, p) => {
               if (typeof window !== 'undefined' && window.bookEchoAPI) {
                 window.bookEchoAPI.openInAppleBooks(id, p);
@@ -481,6 +578,12 @@ export default function App() {
             onRemoveTag={handleRemoveTag}
             onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
             onRequestContext={handleRequestContext}
+            activeChapter={activeChapter}
+            onActiveChapterChange={setActiveChapter}
+            readingChapterContent={readingChapterContent}
+            isLoadingChapterContent={isLoadingChapterContent}
+            onReadChapter={handleReadChapter}
+            onCloseChapterReader={() => setReadingChapterContent(null)}
           />
         ) : (
           <BookshelfView books={books} onSelectBook={handleSelectBook} />

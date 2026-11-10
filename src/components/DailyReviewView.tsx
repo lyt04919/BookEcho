@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { AnnotationItem, ColorSemanticConfig } from '../../electron/types/ipc';
-import { Sparkles, Check, RotateCcw, ChevronRight, BookOpen, Star } from 'lucide-react';
+import { Sparkles, Check, RotateCcw, ChevronRight, BookOpen, Star, Eye, EyeOff } from 'lucide-react';
 
 export interface DailyReviewViewProps {
   queue: AnnotationItem[];
   colorSemantics: ColorSemanticConfig[];
   onSubmitResult: (uuid: string, result: 'remembered' | 'mastered' | 'reset') => void;
   onRefreshQueue: () => void;
+  initialClozeMode?: boolean;
 }
 
 export function handleReviewKeyDown(
   e: { key: string; target?: EventTarget | null; preventDefault?: () => void },
   currentItem: AnnotationItem | undefined,
-  onAction: (result: 'remembered' | 'mastered' | 'reset') => void
+  onAction: (result: 'remembered' | 'mastered' | 'reset') => void,
+  onToggleReveal?: () => void
 ): boolean {
   const target = e.target as { tagName?: string } | null | undefined;
   const tagName = target?.tagName?.toUpperCase();
@@ -20,6 +22,11 @@ export function handleReviewKeyDown(
     return false;
   }
   if (!currentItem) return false;
+  if (e.key === 'Tab' && onToggleReveal) {
+    e.preventDefault?.();
+    onToggleReveal();
+    return true;
+  }
   if (e.key === 'ArrowRight' || e.key === ' ') {
     e.preventDefault?.();
     onAction('remembered');
@@ -36,15 +43,19 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
   queue,
   colorSemantics,
   onSubmitResult,
-  onRefreshQueue
+  onRefreshQueue,
+  initialClozeMode = false
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isClozeMode, setIsClozeMode] = useState(initialClozeMode);
+  const [isRevealed, setIsRevealed] = useState(false);
 
   const currentItem = queue[currentIndex];
 
   const handleAction = (result: 'remembered' | 'mastered' | 'reset') => {
     if (!currentItem) return;
     onSubmitResult(currentItem.uuid, result);
+    setIsRevealed(false);
     if (currentIndex < queue.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -54,14 +65,19 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      handleReviewKeyDown(e, currentItem, handleAction);
+      handleReviewKeyDown(
+        e,
+        currentItem,
+        handleAction,
+        isClozeMode ? () => setIsRevealed(prev => !prev) : undefined
+      );
     };
 
     if (typeof window !== 'undefined') {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [currentIndex, currentItem, queue.length]);
+  }, [currentIndex, currentItem, queue.length, isClozeMode]);
 
   if (!currentItem || currentIndex >= queue.length) {
     return (
@@ -93,13 +109,31 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 bg-paper-bg dark:bg-night-bg overflow-y-auto">
-      {/* 进度计数器 */}
+      {/* 进度计数器与主动回忆开关 */}
       <div className="w-full max-w-xl flex items-center justify-between text-xs text-paper-muted dark:text-night-muted mb-4">
         <span className="flex items-center gap-1 font-medium">
           <Sparkles className="w-3.5 h-3.5 text-amber-500" />
           <span>每日漫游 · 专注模式</span>
         </span>
-        <span data-testid="review-progress">{currentIndex + 1} / {queue.length}</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setIsClozeMode(prev => !prev);
+              setIsRevealed(false);
+            }}
+            data-testid="cloze-mode-toggle"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] transition-colors ${
+              isClozeMode
+                ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
+                : 'bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+            }`}
+            title="开启后遮挡高亮原句，先通过章节和想法主动回忆，按 Tab 键或点击原句揭晓"
+          >
+            {isClozeMode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            <span>主动回忆遮挡</span>
+          </button>
+          <span data-testid="review-progress">{currentIndex + 1} / {queue.length}</span>
+        </div>
       </div>
 
       {/* 沉浸式单卡 */}
@@ -124,9 +158,20 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
           )}
         </div>
 
-        <blockquote className="font-serif text-lg leading-relaxed text-paper-text dark:text-night-text tracking-wide mb-6">
+        <blockquote
+          onClick={() => isClozeMode && setIsRevealed(prev => !prev)}
+          data-testid="review-quote-block"
+          className={`font-serif text-lg leading-relaxed text-paper-text dark:text-night-text tracking-wide mb-6 transition-all ${
+            isClozeMode && !isRevealed ? 'blur-sm select-none cursor-pointer' : ''
+          }`}
+        >
           “{currentItem.selectedText}”
         </blockquote>
+        {isClozeMode && !isRevealed && (
+          <p className="text-[11px] text-paper-terracotta dark:text-night-terracotta mb-4 -mt-3">
+            💡 主动回忆中：点击上方遮挡句子或按 <kbd className="px-1 py-0.5 rounded bg-paper-drawer dark:bg-night-drawer font-mono">Tab</kbd> 键揭晓原文
+          </p>
+        )}
 
         {currentItem.note && (
           <div

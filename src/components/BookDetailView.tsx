@@ -4,7 +4,8 @@ import {
   AnnotationItem,
   ColorSemanticConfig,
   HighlightColor,
-  HighlightContextResult
+  HighlightContextResult,
+  ChapterContentResult
 } from '../../electron/types/ipc';
 import { HighlightCard } from './HighlightCard';
 import {
@@ -14,7 +15,8 @@ import {
   Star,
   MessageSquare,
   Search,
-  X
+  X,
+  BookOpen
 } from 'lucide-react';
 
 export interface BookDetailViewProps {
@@ -30,6 +32,12 @@ export interface BookDetailViewProps {
   onRemoveTag: (uuid: string, tag: string) => void;
   onOpenQuoteModal: (annotation: AnnotationItem) => void;
   onRequestContext: (annotation: AnnotationItem) => Promise<HighlightContextResult>;
+  activeChapter?: string | null;
+  onActiveChapterChange?: (chapter: string) => void;
+  readingChapterContent?: ChapterContentResult | null;
+  isLoadingChapterContent?: boolean;
+  onReadChapter?: (chapterTitle: string) => void;
+  onCloseChapterReader?: () => void;
 }
 
 export const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -44,7 +52,12 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
   onAddTag,
   onRemoveTag,
   onOpenQuoteModal,
-  onRequestContext
+  onRequestContext,
+  onActiveChapterChange,
+  readingChapterContent = null,
+  isLoadingChapterContent = false,
+  onReadChapter,
+  onCloseChapterReader
 }) => {
   // 单书内专属筛选状态
   const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
@@ -107,8 +120,32 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
     setSearchKeyword('');
   };
 
+  // Scroll Spy: 滚动时检测当前处于视口顶部的章节
+  const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (!onActiveChapterChange) return;
+    const container = e.currentTarget;
+    const sections = container.querySelectorAll('section[data-chapter-title]');
+    let currentChap: string | null = null;
+
+    for (let i = 0; i < sections.length; i++) {
+      const sec = sections[i] as HTMLElement;
+      const rect = sec.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      if (rect.top - containerRect.top <= 140) {
+        currentChap = sec.getAttribute('data-chapter-title');
+      }
+    }
+
+    if (currentChap) {
+      onActiveChapterChange(currentChap);
+    }
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text p-8">
+    <div
+      onScroll={handleContainerScroll}
+      className="flex-1 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text p-8"
+    >
       {/* 顶栏导航 */}
       <div className="flex items-center justify-between pb-6 mb-8 border-b border-paper-border dark:border-night-border">
         <button
@@ -266,6 +303,55 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
         </div>
       )}
 
+      {/* 章节原文阅读面板（当点击无笔记章节或点击「阅读本章原文」时展开） */}
+      {(isLoadingChapterContent || readingChapterContent) && (
+        <div
+          data-testid="chapter-reader-panel"
+          className="mb-8 p-6 rounded-2xl bg-paper-card dark:bg-night-card border border-paper-terracotta/40 dark:border-night-terracotta/40 shadow-sm max-w-4xl"
+        >
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-paper-border dark:border-night-border">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta" />
+              <h3 className="font-serif text-lg font-bold text-paper-text dark:text-night-text">
+                {readingChapterContent?.chapterTitle || '正在加载章节原文...'}
+              </h3>
+              {readingChapterContent?.available && (
+                <span className="text-xs text-paper-muted dark:text-night-muted">
+                  （共 {readingChapterContent.paragraphs.length} 段正文）
+                </span>
+              )}
+            </div>
+            {onCloseChapterReader && (
+              <button
+                onClick={onCloseChapterReader}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>收起原文</span>
+              </button>
+            )}
+          </div>
+
+          {isLoadingChapterContent ? (
+            <p className="text-xs text-paper-muted dark:text-night-muted py-6 text-center">
+              正在从本地 EPUB 解析本章正文段落...
+            </p>
+          ) : readingChapterContent && readingChapterContent.available ? (
+            <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-2 font-serif text-sm leading-loose text-paper-text/90 dark:text-night-text/90">
+              {readingChapterContent.paragraphs.map((para, idx) => (
+                <p key={idx} className="indent-0">
+                  {para}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-paper-muted dark:text-night-muted py-6 text-center">
+              未能在本地 EPUB 文件中提取到该章节的正文内容（可能书籍尚未下载到本地或受 DRM 保护）。
+            </p>
+          )}
+        </div>
+      )}
+
       {/* 章节流式展示 */}
       {annotations.length === 0 ? (
         <div className="text-center py-16 text-paper-muted dark:text-night-muted">
@@ -285,12 +371,30 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
       ) : (
         <div className="space-y-10 max-w-4xl">
           {Object.entries(chapterGroups).map(([chapter, items]) => (
-            <section key={chapter} id={`chapter-${encodeURIComponent(chapter)}`} className="space-y-4 scroll-mt-6">
-              <h2 className="font-serif text-lg font-bold text-paper-text dark:text-night-text flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-paper-terracotta dark:bg-night-terracotta" />
-                <span>{chapter}</span>
-                <span className="text-xs font-normal text-paper-muted dark:text-night-muted">({items.length}条)</span>
-              </h2>
+            <section
+              key={chapter}
+              id={`chapter-${encodeURIComponent(chapter)}`}
+              data-chapter-title={chapter}
+              className="space-y-4 scroll-mt-6"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="font-serif text-lg font-bold text-paper-text dark:text-night-text flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-paper-terracotta dark:bg-night-terracotta" />
+                  <span>{chapter}</span>
+                  <span className="text-xs font-normal text-paper-muted dark:text-night-muted">({items.length}条)</span>
+                </h2>
+
+                {onReadChapter && book.epubPath && (
+                  <button
+                    onClick={() => onReadChapter(chapter)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta hover:bg-paper-drawer dark:hover:bg-night-drawer transition-colors"
+                    title="展开阅读本章完整 EPUB 原文"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>阅读本章原文</span>
+                  </button>
+                )}
+              </div>
 
               <div className="space-y-4">
                 {items.map(anno => (

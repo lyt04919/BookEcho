@@ -10,13 +10,16 @@ import {
   MessageSquareQuote,
   RefreshCw,
   Bookmark,
-  List
+  List,
+  BarChart3
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
+export type NavTab = 'books' | 'review' | 'search' | 'starred_notes' | 'insights';
+
 export interface SidebarProps {
-  currentTab: 'books' | 'review' | 'search' | 'starred_notes';
-  onSelectTab: (tab: 'books' | 'review' | 'search' | 'starred_notes') => void;
+  currentTab: NavTab;
+  onSelectTab: (tab: NavTab) => void;
   colorSemantics?: ColorSemanticConfig[];
   selectedColor?: HighlightColor | null;
   onSelectColor?: (color: HighlightColor | null) => void;
@@ -31,6 +34,9 @@ export interface SidebarProps {
   onSelectBook?: (book: BookItem) => void;
   chapters?: (string | { title: string; notesCount: number })[];
   onSelectChapter?: (chapter: string) => void;
+  activeChapter?: string | null;
+  onlyChaptersWithNotes?: boolean;
+  onToggleChaptersFilter?: () => void;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
 }
@@ -49,6 +55,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectBook,
   chapters = [],
   onSelectChapter,
+  activeChapter = null,
+  onlyChaptersWithNotes = false,
+  onToggleChaptersFilter,
   onRefreshData,
   isRefreshing = false
 }) => {
@@ -57,6 +66,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .filter(b => (b.highlightsCount || 0) > 0)
     .sort((a, b) => b.highlightsCount - a.highlightsCount)
     .slice(0, 10);
+
+  const visibleChapters = onlyChaptersWithNotes
+    ? chapters.filter(item => (typeof item === 'string' ? true : item.notesCount > 0))
+    : chapters;
 
   return (
     <aside className="w-60 h-full flex-shrink-0 flex flex-col justify-between border-r border-paper-border dark:border-night-border bg-paper-sidebar dark:bg-night-sidebar p-4 select-none overflow-hidden">
@@ -112,13 +125,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => onSelectTab('search')}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              currentTab === 'search'
+              currentTab === 'search' && !selectedTag
                 ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
                 : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
             }`}
           >
             <Search className="w-4 h-4 text-blue-500" />
             <span>全局搜索</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('insights')}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              currentTab === 'insights' && !selectedTag
+                ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>阅读足迹</span>
           </button>
         </nav>
       </div>
@@ -128,19 +153,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* 状态 A: 处于单书精读时，展示本书章节目录导航 */}
         {selectedBook && chapters.length > 0 ? (
           <div>
-            <div className="flex items-center gap-1.5 px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
-              <List className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
-              <span>章节目录</span>
+            <div className="flex items-center justify-between px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
+              <div className="flex items-center gap-1.5">
+                <List className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+                <span>章节目录</span>
+              </div>
+              {onToggleChaptersFilter && (
+                <button
+                  onClick={onToggleChaptersFilter}
+                  className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors"
+                  title="切换显示全部章节或仅显示有笔记的章节"
+                >
+                  {onlyChaptersWithNotes ? '仅看有笔记' : '全部章节'}
+                </button>
+              )}
             </div>
             <div className="space-y-0.5">
-              {chapters.map(item => {
+              {visibleChapters.map(item => {
                 const title = typeof item === 'string' ? item : item.title;
                 const notesCount = typeof item === 'string' ? 0 : item.notesCount;
+                const isActive = activeChapter === title;
                 return (
                   <button
                     key={title}
                     onClick={() => onSelectChapter && onSelectChapter(title)}
-                    className="w-full flex items-center justify-between px-3 py-1.5 rounded text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors group"
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded text-xs transition-colors group ${
+                      isActive
+                        ? 'bg-white dark:bg-night-card text-paper-terracotta dark:text-night-terracotta font-medium shadow-2xs'
+                        : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+                    }`}
                     title={title}
                   >
                     <span className="truncate max-w-[135px] font-serif group-hover:text-paper-terracotta dark:group-hover:text-night-terracotta">

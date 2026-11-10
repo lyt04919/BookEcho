@@ -129,6 +129,15 @@ function registerIpcHandlers() {
     }));
   });
 
+  ipcMain.handle('books:getChapterContent', async (_, assetId: string, chapterTitle: string) => {
+    const books = syncer.extractBooks();
+    const book = books.find(b => b.assetId === assetId);
+    if (!book || !book.epubPath) {
+      return { available: false, chapterTitle, paragraphs: [] };
+    }
+    return epubEngine.extractChapterContent(book.epubPath, chapterTitle);
+  });
+
   ipcMain.handle('annotations:search', async (_, keyword: string) => {
     const all = syncer.extractAnnotations();
     const lower = keyword.toLowerCase().trim();

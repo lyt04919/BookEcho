@@ -63,11 +63,18 @@ export interface ChapterItem {
   notesCount: number;
 }
 
+export interface ChapterContentResult {
+  available: boolean;
+  chapterTitle: string;
+  paragraphs: string[];
+}
+
 export interface BookEchoAPI {
   // 书架与高亮读取
   getBooks: () => Promise<BookItem[]>;
   getBookAnnotations: (assetId?: string) => Promise<AnnotationItem[]>;
   getBookChapters: (assetId: string) => Promise<ChapterItem[]>;
+  getChapterContent: (assetId: string, chapterTitle: string) => Promise<ChapterContentResult>;
   searchAnnotations: (keyword: string) => Promise<AnnotationItem[]>;
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) => Promise<HighlightContextResult>;
 

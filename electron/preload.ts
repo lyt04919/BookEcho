@@ -5,6 +5,8 @@ const api: BookEchoAPI = {
   getBooks: () => ipcRenderer.invoke('books:getAll'),
   getBookAnnotations: (assetId?: string) => ipcRenderer.invoke('annotations:getByBook', assetId),
   getBookChapters: (assetId: string) => ipcRenderer.invoke('books:getChapters', assetId),
+  getChapterContent: (assetId: string, chapterTitle: string) =>
+    ipcRenderer.invoke('books:getChapterContent', assetId, chapterTitle),
   searchAnnotations: (keyword: string) => ipcRenderer.invoke('annotations:search', keyword),
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) =>
     ipcRenderer.invoke('context:get', assetId, locationCfi, selectedText),

@@ -263,5 +263,23 @@ describe('BookDetailView Component', () => {
     const html = renderToStaticMarkup(<BookDetailView {...props} />);
     expect(html).toContain('阅读进度 0%');
   });
+
+  it('should render chapter reader panel when readingChapterContent is provided', () => {
+    const props = createDefaultProps({
+      readingChapterContent: {
+        available: true,
+        chapterTitle: '第三章 尚无划线的章节',
+        paragraphs: ['这是第三章的第一段原文内容。', '这是第三章的第二段原文内容。']
+      },
+      onCloseChapterReader: vi.fn(),
+      onReadChapter: vi.fn()
+    });
+    const html = renderToStaticMarkup(<BookDetailView {...props} />);
+    expect(html).toContain('data-testid="chapter-reader-panel"');
+    expect(html).toContain('第三章 尚无划线的章节');
+    expect(html).toContain('这是第三章的第一段原文内容。');
+    expect(html).toContain('收起原文');
+    expect(html).toContain('阅读本章原文');
+  });
 });
 

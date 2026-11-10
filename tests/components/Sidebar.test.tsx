@@ -43,6 +43,7 @@ describe('Sidebar Component', () => {
     expect(html).toContain('批注与星标');
     expect(html).toContain('每日回顾');
     expect(html).toContain('全局搜索');
+    expect(html).toContain('阅读足迹');
   });
 
   it('should highlight active tab appropriately', () => {
@@ -71,12 +72,37 @@ describe('Sidebar Component', () => {
       <Sidebar
         {...defaultProps}
         selectedBook={mockBooks[0]}
-        chapters={['第一章 财富', '第二章 判断力']}
+        chapters={[
+          { title: '第一章 财富', notesCount: 5 },
+          { title: '第二章 判断力', notesCount: 0 }
+        ]}
+        activeChapter="第一章 财富"
+        onlyChaptersWithNotes={false}
+        onToggleChaptersFilter={vi.fn()}
       />
     );
     expect(html).toContain('章节目录');
+    expect(html).toContain('全部章节');
     expect(html).toContain('第一章 财富');
     expect(html).toContain('第二章 判断力');
+  });
+
+  it('should filter out chapters with 0 notes when onlyChaptersWithNotes is true', () => {
+    const html = renderToStaticMarkup(
+      <Sidebar
+        {...defaultProps}
+        selectedBook={mockBooks[0]}
+        chapters={[
+          { title: '第一章 财富', notesCount: 5 },
+          { title: '第二章 判断力', notesCount: 0 }
+        ]}
+        onlyChaptersWithNotes={true}
+        onToggleChaptersFilter={vi.fn()}
+      />
+    );
+    expect(html).toContain('仅看有笔记');
+    expect(html).toContain('第一章 财富');
+    expect(html).not.toContain('第二章 判断力');
   });
 
   it('should render tags when tags array is non-empty', () => {
