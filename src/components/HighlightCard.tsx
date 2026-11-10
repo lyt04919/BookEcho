@@ -284,7 +284,7 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
         ) : (
           <button
             onClick={() => setIsTagInputOpen(true)}
-            className="text-[11px] text-paper-muted/60 dark:text-night-muted/60 hover:text-paper-terracotta dark:hover:text-night-terracotta flex items-center gap-0.5 transition-colors"
+            className="text-[11px] px-2 py-0.5 rounded bg-paper-drawer/70 dark:bg-night-drawer/70 text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta flex items-center gap-1 transition-colors"
           >
             <Plus className="w-2.5 h-2.5" />
             <span>标签</span>

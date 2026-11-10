@@ -67,7 +67,7 @@ describe('Sidebar Component', () => {
     expect(html).toContain('74');
   });
 
-  it('should render chapters list when in book detail mode', () => {
+  it('should render chapters list when in book detail mode and hide redundant global tabs', () => {
     const html = renderToStaticMarkup(
       <Sidebar
         {...defaultProps}
@@ -81,6 +81,10 @@ describe('Sidebar Component', () => {
         onToggleChaptersFilter={vi.fn()}
       />
     );
+    expect(html).toContain('返回全部书架');
+    expect(html).not.toContain('批注与星标');
+    expect(html).not.toContain('每日回顾');
+    expect(html).not.toContain('阅读足迹');
     expect(html).toContain('章节目录');
     expect(html).toContain('全部章节');
     expect(html).toContain('第一章 财富');

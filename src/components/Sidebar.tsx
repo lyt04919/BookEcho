@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Bookmark,
   List,
-  BarChart3
+  BarChart3,
+  ArrowLeft
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
@@ -84,68 +85,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className="text-xs text-paper-muted dark:text-night-muted mt-0.5">个人读书精华馆</p>
         </div>
 
-        {/* 主导航区 */}
-        <nav className="space-y-1">
-          <button
-            onClick={() => onSelectTab('books')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              currentTab === 'books' && !selectedBook
-                ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-            }`}
-          >
-            <BookOpen className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta" />
-            <span>全部书架</span>
-          </button>
+        {/* 主导航区：单书精读模式下仅保留「返回全部书架」，释放侧边栏空间给章节目录 */}
+        {selectedBook ? (
+          <nav className="space-y-1">
+            <button
+              onClick={() => onSelectTab('books')}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-white dark:bg-night-card shadow-2xs text-paper-text dark:text-night-text hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+              <span>返回全部书架</span>
+            </button>
+          </nav>
+        ) : (
+          <nav className="space-y-1">
+            <button
+              onClick={() => onSelectTab('books')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'books' && !selectedBook && !selectedTag
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta" />
+              <span>全部书架</span>
+            </button>
 
-          <button
-            onClick={() => onSelectTab('starred_notes')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              currentTab === 'starred_notes'
-                ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-            }`}
-          >
-            <MessageSquareQuote className="w-4 h-4 text-purple-500" />
-            <span>批注与星标</span>
-          </button>
+            <button
+              onClick={() => onSelectTab('starred_notes')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'starred_notes' && !selectedTag
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <MessageSquareQuote className="w-4 h-4 text-purple-500" />
+              <span>批注与星标</span>
+            </button>
 
-          <button
-            onClick={() => onSelectTab('review')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              currentTab === 'review'
-                ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>每日回顾</span>
-          </button>
+            <button
+              onClick={() => onSelectTab('review')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'review' && !selectedTag
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>每日回顾</span>
+            </button>
 
-          <button
-            onClick={() => onSelectTab('search')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              currentTab === 'search' && !selectedTag
-                ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-            }`}
-          >
-            <Search className="w-4 h-4 text-blue-500" />
-            <span>全局搜索</span>
-          </button>
+            <button
+              onClick={() => onSelectTab('search')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'search' && !selectedTag
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <Search className="w-4 h-4 text-blue-500" />
+              <span>全局搜索</span>
+            </button>
 
-          <button
-            onClick={() => onSelectTab('insights')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              currentTab === 'insights' && !selectedTag
-                ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>阅读足迹</span>
-          </button>
-        </nav>
+            <button
+              onClick={() => onSelectTab('insights')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'insights' && !selectedTag
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>阅读足迹</span>
+            </button>
+          </nav>
+        )}
       </div>
 
       {/* 2. 中间自适应独立滚动区：重点笔记书单 / 单书章节目录 / 标签 */}
@@ -223,31 +236,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : null}
 
-        {/* 标签树 */}
-        {tags.length > 0 && (
+        {/* 标签树：仅在非单书精读页展示，且即使尚无标签也展示入口提示 */}
+        {!selectedBook && (
           <div>
-            <div className="px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
-              标签
+            <div className="flex items-center gap-1.5 px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
+              <Tag className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+              <span>主题标签</span>
             </div>
-            <div className="flex flex-wrap gap-1.5 px-2">
-              {tags.map(t => {
-                const isSelected = selectedTag === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => onSelectTag(isSelected ? null : t)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                      isSelected
-                        ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
-                        : 'bg-white/70 dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:bg-white dark:hover:bg-white/10 hover:text-paper-text dark:hover:text-night-text'
-                    }`}
-                  >
-                    <Tag className="w-3 h-3" />
-                    <span>#{t}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {tags.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 px-2">
+                {tags.map(t => {
+                  const isSelected = selectedTag === t;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => onSelectTag(isSelected ? null : t)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                        isSelected
+                          ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
+                          : 'bg-white/70 dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:bg-white dark:hover:bg-white/10 hover:text-paper-text dark:hover:text-night-text'
+                      }`}
+                    >
+                      <Tag className="w-3 h-3" />
+                      <span>#{t}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="px-3 text-[11px] leading-relaxed text-paper-muted/70 dark:text-night-muted/70">
+                在书籍高亮卡片下方点击「+ 标签」，即可在此按跨书主题归档
+              </p>
+            )}
           </div>
         )}
       </div>
