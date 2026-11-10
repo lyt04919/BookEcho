@@ -207,56 +207,12 @@ describe('BookshelfView Component', () => {
     }
   });
 
-  it('should render filter banner and color badge when selectedColor is active', () => {
-    const html = renderToStaticMarkup(
-      <BookshelfView
-        {...defaultProps}
-        selectedColor="green"
-        colorSemantics={[
-          { colorKey: 'green', label: '行动与实践', hexColor: '#5CB85C' }
-        ]}
-        filteredCountMap={{ 'asset-book-b': 5 }}
-        onClearFilter={vi.fn()}
-      />
-    );
-
-    expect(html).toContain('data-testid="filter-banner"');
-    expect(html).toContain('data-testid="active-color-filter"');
-    expect(html).toContain('行动与实践');
-    expect(html).toContain('data-testid="clear-filter-btn"');
-    expect(html).toContain('筛选结果: 3 本书');
-  });
-
-  it('should render tag filter when selectedTag is active', () => {
-    const html = renderToStaticMarkup(
-      <BookshelfView
-        {...defaultProps}
-        selectedTag="心智模型"
-        onClearFilter={vi.fn()}
-      />
-    );
-
-    expect(html).toContain('data-testid="filter-banner"');
-    expect(html).toContain('data-testid="active-tag-filter"');
-    expect(html).toContain('#心智模型');
-  });
-
-  it('should render empty filtered state when no books match filter', () => {
-    const onClear = vi.fn();
-    const html = renderToStaticMarkup(
-      <BookshelfView
-        books={[]}
-        onSelectBook={vi.fn()}
-        selectedColor="pink"
-        colorSemantics={[
-          { colorKey: 'pink', label: '灵感与金句', hexColor: '#E86F88' }
-        ]}
-        onClearFilter={onClear}
-      />
-    );
-
-    expect(html).toContain('未找到包含该筛选条件的书籍');
-    expect(html).toContain('data-testid="empty-clear-filter-btn"');
+  it('should render book collection quick filters for all and notes-only', () => {
+    const html = renderToStaticMarkup(<BookshelfView {...defaultProps} />);
+    expect(html).toContain('data-testid="filter-all-books"');
+    expect(html).toContain('data-testid="filter-notes-books"');
+    expect(html).toContain('全部藏书 (3)');
+    expect(html).toContain('有笔记的书 (3)');
   });
 });
 

@@ -13,7 +13,8 @@ import { DailyReviewView } from './components/DailyReviewView';
 import { QuoteCardModal } from './components/QuoteCardModal';
 import { ExportModal } from './components/ExportModal';
 import { PermissionGuide } from './components/PermissionGuide';
-import { Search } from 'lucide-react';
+import { HighlightCard } from './components/HighlightCard';
+import { Search, MessageSquareQuote, Download, Sparkles } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
@@ -25,7 +26,7 @@ const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
 ];
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'books' | 'review' | 'search'>('books');
+  const [currentTab, setCurrentTab] = useState<'books' | 'review' | 'search' | 'starred_notes'>('books');
   const [books, setBooks] = useState<BookItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationItem[]>([]);
@@ -41,6 +42,7 @@ export default function App() {
   const [exportBookAssetId, setExportBookAssetId] = useState<string | null>(null);
   const [hasPermissionError, setHasPermissionError] = useState(false);
   const [allAnnotations, setAllAnnotations] = useState<AnnotationItem[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 初始化加载数据
   const loadInitialData = async () => {
@@ -84,6 +86,7 @@ export default function App() {
   // 切换单书精读
   const handleSelectBook = async (book: BookItem) => {
     setSelectedBook(book);
+    setCurrentTab('books');
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
         const annos = await window.bookEchoAPI.getBookAnnotations(book.assetId);
@@ -94,6 +97,20 @@ export default function App() {
       }
     } else {
       setCurrentAnnotations([]);
+    }
+  };
+
+  // 刷新同步
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadInitialData();
+      if (selectedBook && typeof window !== 'undefined' && window.bookEchoAPI) {
+        const annos = await window.bookEchoAPI.getBookAnnotations(selectedBook.assetId);
+        setCurrentAnnotations(annos || []);
+      }
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
     }
   };
 
@@ -245,32 +262,26 @@ export default function App() {
     };
   };
 
-  // 单书详情页高亮过滤
-  const filteredAnnotations = currentAnnotations.filter(a => {
-    if (selectedColor && a.colorKey !== selectedColor) return false;
-    if (selectedTag && !(a.tags || []).includes(selectedTag)) return false;
-    return true;
-  });
+  // 当前选中书籍包含的章节列表（用于侧边栏章节目录）
+  const currentBookChapters = Array.from(
+    new Set(
+      currentAnnotations
+        .map(a => a.chapterTitle?.trim() || '默认章节')
+        .filter(Boolean)
+    )
+  );
 
-  // 首页书架过滤计算
-  const matchingAnnotationsForBookshelf = allAnnotations.filter(a => {
-    if (selectedColor && a.colorKey !== selectedColor) return false;
-    if (selectedTag && !(a.tags || []).includes(selectedTag)) return false;
-    return true;
-  });
-
-  const matchingAssetIds = new Set(matchingAnnotationsForBookshelf.map(a => a.assetId));
-
-  const filteredBookshelfBooks = (selectedColor || selectedTag)
-    ? books.filter(b => matchingAssetIds.has(b.assetId))
-    : books;
-
-  const filteredCountMap: Record<string, number> = {};
-  if (selectedColor || selectedTag) {
-    for (const a of matchingAnnotationsForBookshelf) {
-      filteredCountMap[a.assetId] = (filteredCountMap[a.assetId] || 0) + 1;
+  const handleSelectChapter = (chapter: string) => {
+    if (typeof document !== 'undefined') {
+      const el = document.getElementById(`chapter-${encodeURIComponent(chapter)}`);
+      el?.scrollIntoView({ behavior: 'smooth' });
     }
-  }
+  };
+
+  // 全书库中的批注与星标精华
+  const starredAndNoteAnnos = allAnnotations.filter(
+    a => a.isStarred || Boolean(a.note?.trim() || a.customNote?.trim())
+  );
 
   const exportingBook = exportBookAssetId
     ? books.find(b => b.assetId === exportBookAssetId) || selectedBook
@@ -286,28 +297,16 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={tab => {
           setCurrentTab(tab);
-          setSelectedBook(null);
-          if (tab === 'books') {
-            setSelectedColor(null);
-            setSelectedTag(null);
+          if (tab !== 'books') {
+            setSelectedBook(null);
           }
         }}
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
-        onSelectColor={color => {
-          setSelectedColor(color);
-          if (currentTab !== 'books') {
-            setCurrentTab('books');
-          }
-        }}
+        onSelectColor={setSelectedColor}
         tags={tags}
         selectedTag={selectedTag}
-        onSelectTag={tag => {
-          setSelectedTag(tag);
-          if (currentTab !== 'books') {
-            setCurrentTab('books');
-          }
-        }}
+        onSelectTag={setSelectedTag}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
         onSelectCustomDir={async () => {
@@ -316,6 +315,13 @@ export default function App() {
             loadInitialData();
           }
         }}
+        books={books}
+        selectedBook={selectedBook}
+        onSelectBook={handleSelectBook}
+        chapters={currentBookChapters}
+        onSelectChapter={handleSelectChapter}
+        onRefreshData={handleRefreshData}
+        isRefreshing={isRefreshing}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -382,10 +388,78 @@ export default function App() {
             }}
             onRefreshQueue={loadReviewQueue}
           />
+        ) : currentTab === 'starred_notes' ? (
+          /* 批注与星标独立专属汇总馆 */
+          <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4">
+              <div>
+                <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text flex items-center gap-2">
+                  <MessageSquareQuote className="w-7 h-7 text-paper-terracotta dark:text-night-terracotta" />
+                  <span>批注与星标精选</span>
+                </h2>
+                <p className="text-sm text-paper-muted dark:text-night-muted mt-1.5">
+                  共收录全书库 {starredAndNoteAnnos.length} 条深度思考想法与星标金句
+                </p>
+              </div>
+
+              {starredAndNoteAnnos.length > 0 && (
+                <button
+                  onClick={() => {
+                    const firstBook = books[0];
+                    if (firstBook) setExportBookAssetId(firstBook.assetId);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>导出笔记</span>
+                </button>
+              )}
+            </div>
+
+            {starredAndNoteAnnos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <Sparkles className="w-12 h-12 text-paper-muted/40 dark:text-night-muted/40 mb-3" />
+                <p className="text-base font-serif font-medium text-paper-text dark:text-night-text">
+                  暂无批注与星标
+                </p>
+                <p className="text-xs text-paper-muted dark:text-night-muted mt-1">
+                  在书籍高亮上标记 ⭐ 星标或补充二次想法，将自动汇集在此
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-w-4xl">
+                {starredAndNoteAnnos.map(anno => (
+                  <div key={anno.uuid} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-paper-muted dark:text-night-muted px-1">
+                      <span
+                        onClick={() => {
+                          const matchedBook = books.find(b => b.assetId === anno.assetId);
+                          if (matchedBook) handleSelectBook(matchedBook);
+                        }}
+                        className="cursor-pointer hover:text-paper-terracotta dark:hover:text-night-terracotta font-serif font-medium"
+                      >
+                        《{anno.bookTitle || '未知书籍'}》 · {anno.chapterTitle || '默认章节'}
+                      </span>
+                    </div>
+                    <HighlightCard
+                      annotation={anno}
+                      colorSemantics={colorSemantics}
+                      onToggleStar={handleToggleStar}
+                      onUpdateCustomNote={handleUpdateCustomNote}
+                      onAddTag={handleAddTag}
+                      onRemoveTag={handleRemoveTag}
+                      onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
+                      onRequestContext={handleRequestContext}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : selectedBook ? (
           <BookDetailView
             book={selectedBook}
-            annotations={filteredAnnotations}
+            annotations={currentAnnotations}
             colorSemantics={colorSemantics}
             onBack={() => setSelectedBook(null)}
             onOpenInAppleBooks={(id, p) => {
@@ -402,25 +476,7 @@ export default function App() {
             onRequestContext={handleRequestContext}
           />
         ) : (
-          <BookshelfView
-            books={filteredBookshelfBooks}
-            onSelectBook={handleSelectBook}
-            selectedColor={selectedColor}
-            selectedTag={selectedTag}
-            colorSemantics={colorSemantics}
-            matchingAnnotations={matchingAnnotationsForBookshelf}
-            filteredCountMap={filteredCountMap}
-            onClearFilter={() => {
-              setSelectedColor(null);
-              setSelectedTag(null);
-            }}
-            onToggleStar={handleToggleStar}
-            onUpdateCustomNote={handleUpdateCustomNote}
-            onAddTag={handleAddTag}
-            onRemoveTag={handleRemoveTag}
-            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
-            onRequestContext={handleRequestContext}
-          />
+          <BookshelfView books={books} onSelectBook={handleSelectBook} />
         )}
       </main>
 

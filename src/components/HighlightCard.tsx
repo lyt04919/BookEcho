@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnnotationItem, ColorSemanticConfig, HighlightContextResult } from '../../electron/types/ipc';
-import { Star, MessageSquare, ChevronDown, ChevronUp, Image, Tag, Plus, Check } from 'lucide-react';
+import { Star, MessageSquare, ChevronDown, ChevronUp, Image, Tag, Plus, Check, Copy } from 'lucide-react';
 
 export interface HighlightCardProps {
   annotation: AnnotationItem;
@@ -30,9 +30,38 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [contextData, setContextData] = useState<HighlightContextResult | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   const semantic = colorSemantics.find(s => s.colorKey === annotation.colorKey);
   const colorHex = semantic?.hexColor || '#F5A623';
+
+  const handleCopyQuote = async () => {
+    const lines = [`“${annotation.selectedText}”`];
+    if (annotation.note) {
+      lines.push(`划线想法：${annotation.note}`);
+    }
+    if (annotation.customNote) {
+      lines.push(`延伸思考：${annotation.customNote}`);
+    }
+    const sourceParts: string[] = [];
+    if (annotation.bookTitle) sourceParts.push(annotation.bookTitle);
+    if (annotation.chapterTitle && annotation.chapterTitle !== '默认章节') {
+      sourceParts.push(annotation.chapterTitle);
+    }
+    if (sourceParts.length > 0) {
+      lines.push(`——《${sourceParts.join(' · ')}》`);
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(lines.join('\n'));
+      }
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy quote', err);
+    }
+  };
 
   const handleToggleContext = async () => {
     if (!isContextOpen) {
@@ -108,6 +137,18 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          <button
+            onClick={handleCopyQuote}
+            className={`p-1 rounded transition-colors ${
+              isCopied
+                ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
+                : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+            title={isCopied ? '已复制到剪贴板' : '复制引用文字'}
+            aria-label={isCopied ? '已复制到剪贴板' : '复制引用文字'}
+          >
+            {isCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+          </button>
           <button
             onClick={() => onOpenQuoteModal(annotation)}
             className="p-1 rounded text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
