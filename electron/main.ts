@@ -200,6 +200,18 @@ function registerIpcHandlers() {
     return vault.getAllTags();
   });
 
+  ipcMain.handle('tag:createGlobal', async (_, tag: string) => {
+    vault.createGlobalTag(tag);
+  });
+
+  ipcMain.handle('tag:renameGlobal', async (_, oldTag: string, newTag: string) => {
+    vault.renameGlobalTag(oldTag, newTag);
+  });
+
+  ipcMain.handle('tag:deleteGlobal', async (_, tag: string) => {
+    vault.deleteGlobalTag(tag);
+  });
+
   ipcMain.handle('review:getQueue', async (_, limit = 6) => {
     const all = syncer.extractAnnotations();
     const uuids = all.map(a => a.uuid);

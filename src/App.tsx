@@ -304,6 +304,81 @@ export default function App() {
     }
   };
 
+  // 全局标签库：新建、重命名、删除
+  const handleCreateGlobalTag = async (tag: string) => {
+    const cleaned = tag.trim().replace(/^#+/, '');
+    if (!cleaned) return;
+    setTags(prev => (prev.includes(cleaned) ? prev : [...prev, cleaned]));
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.createGlobalTag(cleaned);
+        const updated = await window.bookEchoAPI.getAllTags();
+        if (updated) setTags(updated);
+      } catch (err) {
+        console.error('Failed to create global tag', err);
+      }
+    }
+  };
+
+  const handleRenameGlobalTag = async (oldTag: string, newTag: string) => {
+    const cleanOld = oldTag.trim().replace(/^#+/, '');
+    const cleanNew = newTag.trim().replace(/^#+/, '');
+    if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
+
+    setTags(prev => Array.from(new Set(prev.map(t => (t === cleanOld ? cleanNew : t)))));
+    setCurrentAnnotations(prev =>
+      prev.map(a => ({
+        ...a,
+        tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
+      }))
+    );
+    setAllAnnotations(prev =>
+      prev.map(a => ({
+        ...a,
+        tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
+      }))
+    );
+    if (selectedTag === cleanOld) {
+      setSelectedTag(cleanNew);
+    }
+
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.renameGlobalTag(cleanOld, cleanNew);
+        const updated = await window.bookEchoAPI.getAllTags();
+        if (updated) setTags(updated);
+      } catch (err) {
+        console.error('Failed to rename global tag', err);
+      }
+    }
+  };
+
+  const handleDeleteGlobalTag = async (tag: string) => {
+    const clean = tag.trim().replace(/^#+/, '');
+    if (!clean) return;
+
+    setTags(prev => prev.filter(t => t !== clean));
+    setCurrentAnnotations(prev =>
+      prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
+    );
+    setAllAnnotations(prev =>
+      prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
+    );
+    if (selectedTag === clean) {
+      setSelectedTag(null);
+    }
+
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.deleteGlobalTag(clean);
+        const updated = await window.bookEchoAPI.getAllTags();
+        if (updated) setTags(updated);
+      } catch (err) {
+        console.error('Failed to delete global tag', err);
+      }
+    }
+  };
+
   // 选中图书或搜索结果请求上下文
   const handleRequestContext = async (anno: AnnotationItem): Promise<HighlightContextResult> => {
     const assetId = selectedBook?.assetId || anno.assetId;
@@ -412,12 +487,17 @@ export default function App() {
             }}
             onRetry={loadInitialData}
           />
-        ) : selectedTag ? (
+        ) : currentTab === 'tags' || selectedTag ? (
           <TagTopicView
             tag={selectedTag}
+            tags={tags}
             annotations={allAnnotations}
             books={books}
             colorSemantics={colorSemantics}
+            onSelectTag={setSelectedTag}
+            onCreateGlobalTag={handleCreateGlobalTag}
+            onRenameGlobalTag={handleRenameGlobalTag}
+            onDeleteGlobalTag={handleDeleteGlobalTag}
             onClearTag={() => setSelectedTag(null)}
             onSelectBook={handleSelectBook}
             onToggleStar={handleToggleStar}
@@ -543,6 +623,11 @@ export default function App() {
                     <HighlightCard
                       annotation={anno}
                       colorSemantics={colorSemantics}
+                      availableTags={tags}
+                      onManageTags={() => {
+                        setSelectedBook(null);
+                        setCurrentTab('tags');
+                      }}
                       onToggleStar={handleToggleStar}
                       onUpdateCustomNote={handleUpdateCustomNote}
                       onAddTag={handleAddTag}
@@ -560,6 +645,11 @@ export default function App() {
             book={selectedBook}
             annotations={currentAnnotations}
             colorSemantics={colorSemantics}
+            availableTags={tags}
+            onManageTags={() => {
+              setSelectedBook(null);
+              setCurrentTab('tags');
+            }}
             onBack={() => {
               setSelectedBook(null);
               setBookChapters([]);

@@ -5,6 +5,8 @@ import { Star, MessageSquare, ChevronDown, ChevronUp, Image, Tag, Plus, Check, C
 export interface HighlightCardProps {
   annotation: AnnotationItem;
   colorSemantics: ColorSemanticConfig[];
+  availableTags?: string[];
+  onManageTags?: () => void;
   onToggleStar: (uuid: string) => void;
   onUpdateCustomNote: (uuid: string, note: string) => void;
   onAddTag: (uuid: string, tag: string) => void;
@@ -16,6 +18,8 @@ export interface HighlightCardProps {
 export const HighlightCard: React.FC<HighlightCardProps> = ({
   annotation,
   colorSemantics,
+  availableTags = [],
+  onManageTags,
   onToggleStar,
   onUpdateCustomNote,
   onAddTag,
@@ -25,8 +29,7 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
 }) => {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(annotation.customNote || '');
-  const [isTagInputOpen, setIsTagInputOpen] = useState(false);
-  const [newTagText, setNewTagText] = useState('');
+  const [isTagSelectorOpen, setIsTagSelectorOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [contextData, setContextData] = useState<HighlightContextResult | null>(null);
@@ -102,15 +105,6 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   const handleCancelNote = () => {
     setNoteText(annotation.customNote || '');
     setIsEditingNote(false);
-  };
-
-  const handleAddTag = () => {
-    const cleaned = newTagText.trim().replace(/^#+/, '');
-    if (cleaned) {
-      onAddTag(annotation.uuid, cleaned);
-      setNewTagText('');
-      setIsTagInputOpen(false);
-    }
   };
 
   return (
@@ -254,42 +248,17 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           </span>
         ))}
 
-        {isTagInputOpen ? (
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={newTagText}
-              onChange={e => setNewTagText(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddTag();
-                if (e.key === 'Escape') {
-                  setIsTagInputOpen(false);
-                  setNewTagText('');
-                }
-              }}
-              placeholder="标签名"
-              className="text-[11px] px-1.5 py-0.5 rounded border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text w-20 focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta"
-              autoFocus
-              aria-label="新标签名"
-            />
-            <button
-              onClick={handleAddTag}
-              className="text-paper-terracotta dark:text-night-terracotta hover:opacity-80"
-              title="确认添加"
-              aria-label="确认添加标签"
-            >
-              <Check className="w-3 h-3" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsTagInputOpen(true)}
-            className="text-[11px] px-2 py-0.5 rounded bg-paper-drawer/70 dark:bg-night-drawer/70 text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-2.5 h-2.5" />
-            <span>标签</span>
-          </button>
-        )}
+        <button
+          onClick={() => setIsTagSelectorOpen(prev => !prev)}
+          className={`text-[11px] px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+            isTagSelectorOpen
+              ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
+              : 'bg-paper-drawer/70 dark:bg-night-drawer/70 text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta'
+          }`}
+        >
+          <Plus className="w-2.5 h-2.5" />
+          <span>标签</span>
+        </button>
 
         {/* 原文语境抽屉开关 */}
         <button
@@ -300,6 +269,60 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           {isContextOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
       </div>
+
+      {/* 标签点选面板（仅从统一标签库中点选，不在书内直接新建） */}
+      {isTagSelectorOpen && (
+        <div className="ml-2 mt-2.5 p-2.5 rounded-lg bg-paper-drawer/80 dark:bg-night-drawer/80 border border-paper-border/60 dark:border-night-border/60 flex flex-wrap items-center gap-1.5 text-xs">
+          {availableTags.length > 0 ? (
+            <>
+              <span className="text-[11px] text-paper-muted dark:text-night-muted mr-1">
+                点选标签：
+              </span>
+              {availableTags.map(t => {
+                const isAttached = (annotation.tags || []).includes(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() =>
+                      isAttached
+                        ? onRemoveTag(annotation.uuid, t)
+                        : onAddTag(annotation.uuid, t)
+                    }
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                      isAttached
+                        ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
+                        : 'bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text border border-paper-border dark:border-night-border hover:border-paper-terracotta dark:hover:border-night-terracotta'
+                    }`}
+                  >
+                    {isAttached && <Check className="w-2.5 h-2.5" />}
+                    <span>#{t}</span>
+                  </button>
+                );
+              })}
+              {onManageTags && (
+                <button
+                  onClick={onManageTags}
+                  className="ml-auto text-[11px] text-paper-terracotta dark:text-night-terracotta hover:underline"
+                >
+                  管理标签库 →
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="w-full flex items-center justify-between text-[11px] text-paper-muted dark:text-night-muted">
+              <span>标签库暂无标签，请先在「标签管理」中统一创建</span>
+              {onManageTags && (
+                <button
+                  onClick={onManageTags}
+                  className="text-paper-terracotta dark:text-night-terracotta font-medium hover:underline"
+                >
+                  去新建标签 →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 原文前后上下文展开区域 */}
       {isContextOpen && (

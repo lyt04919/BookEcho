@@ -16,6 +16,9 @@ const api: BookEchoAPI = {
   addTag: (uuid: string, tag: string) => ipcRenderer.invoke('tag:add', uuid, tag),
   removeTag: (uuid: string, tag: string) => ipcRenderer.invoke('tag:remove', uuid, tag),
   getAllTags: () => ipcRenderer.invoke('tag:getAll'),
+  createGlobalTag: (tag: string) => ipcRenderer.invoke('tag:createGlobal', tag),
+  renameGlobalTag: (oldTag: string, newTag: string) => ipcRenderer.invoke('tag:renameGlobal', oldTag, newTag),
+  deleteGlobalTag: (tag: string) => ipcRenderer.invoke('tag:deleteGlobal', tag),
 
   getDailyReviewQueue: (limit?: number) => ipcRenderer.invoke('review:getQueue', limit),
   submitReviewResult: (uuid: string, result: 'remembered' | 'mastered' | 'reset') =>

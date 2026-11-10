@@ -38,6 +38,8 @@ export interface BookDetailViewProps {
   isLoadingChapterContent?: boolean;
   onReadChapter?: (chapterTitle: string) => void;
   onCloseChapterReader?: () => void;
+  availableTags?: string[];
+  onManageTags?: () => void;
 }
 
 export const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -57,7 +59,9 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
   readingChapterContent = null,
   isLoadingChapterContent = false,
   onReadChapter,
-  onCloseChapterReader
+  onCloseChapterReader,
+  availableTags = [],
+  onManageTags
 }) => {
   // 单书内专属筛选状态
   const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
@@ -402,6 +406,8 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
                     key={anno.uuid}
                     annotation={anno}
                     colorSemantics={colorSemantics}
+                    availableTags={availableTags}
+                    onManageTags={onManageTags}
                     onToggleStar={onToggleStar}
                     onUpdateCustomNote={onUpdateCustomNote}
                     onAddTag={onAddTag}

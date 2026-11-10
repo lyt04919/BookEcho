@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
-export type NavTab = 'books' | 'review' | 'search' | 'starred_notes' | 'insights';
+export type NavTab = 'books' | 'review' | 'search' | 'starred_notes' | 'insights' | 'tags';
 
 export interface SidebarProps {
   currentTab: NavTab;
@@ -47,7 +47,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   tags,
   selectedTag,
-  onSelectTag,
   isDarkMode,
   onToggleDarkMode,
   onSelectCustomDir,
@@ -157,6 +156,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>阅读足迹</span>
             </button>
+
+            <button
+              onClick={() => onSelectTab('tags')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'tags' || Boolean(selectedTag)
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <span className="flex items-center gap-2.5">
+                <Tag className="w-4 h-4 text-rose-500" />
+                <span>标签管理</span>
+              </span>
+              {tags.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted font-mono">
+                  {tags.length}
+                </span>
+              )}
+            </button>
           </nav>
         )}
       </div>
@@ -235,41 +253,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         ) : null}
-
-        {/* 标签树：仅在非单书精读页展示，且即使尚无标签也展示入口提示 */}
-        {!selectedBook && (
-          <div>
-            <div className="flex items-center gap-1.5 px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
-              <Tag className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
-              <span>主题标签</span>
-            </div>
-            {tags.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 px-2">
-                {tags.map(t => {
-                  const isSelected = selectedTag === t;
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => onSelectTag(isSelected ? null : t)}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                        isSelected
-                          ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
-                          : 'bg-white/70 dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:bg-white dark:hover:bg-white/10 hover:text-paper-text dark:hover:text-night-text'
-                      }`}
-                    >
-                      <Tag className="w-3 h-3" />
-                      <span>#{t}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="px-3 text-[11px] leading-relaxed text-paper-muted/70 dark:text-night-muted/70">
-                在书籍高亮卡片下方点击「+ 标签」，即可在此按跨书主题归档
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* 3. 底部固定操作区：永远固定在左下角，绝不溢出被遮挡 */}

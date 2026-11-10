@@ -83,6 +83,9 @@ export interface BookEchoAPI {
   addTag: (uuid: string, tag: string) => Promise<void>;
   removeTag: (uuid: string, tag: string) => Promise<void>;
   getAllTags: () => Promise<string[]>;
+  createGlobalTag: (tag: string) => Promise<void>;
+  renameGlobalTag: (oldTag: string, newTag: string) => Promise<void>;
+  deleteGlobalTag: (tag: string) => Promise<void>;
 
   // 每日回顾
   getDailyReviewQueue: (limit?: number) => Promise<AnnotationItem[]>;

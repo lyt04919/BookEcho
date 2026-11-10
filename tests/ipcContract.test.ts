@@ -15,6 +15,9 @@ describe('IPC API Contract Check', () => {
     'addTag',
     'removeTag',
     'getAllTags',
+    'createGlobalTag',
+    'renameGlobalTag',
+    'deleteGlobalTag',
     'getDailyReviewQueue',
     'submitReviewResult',
     'getColorSemantics',
@@ -36,6 +39,9 @@ describe('IPC API Contract Check', () => {
     'tag:add',
     'tag:remove',
     'tag:getAll',
+    'tag:createGlobal',
+    'tag:renameGlobal',
+    'tag:deleteGlobal',
     'review:getQueue',
     'review:submit',
     'semantics:get',
@@ -48,7 +54,7 @@ describe('IPC API Contract Check', () => {
 
   it('should define all required API methods on window.bookEchoAPI interface', () => {
     // 静态校验契约完备性
-    expect(EXPECTED_API_KEYS.length).toBe(18);
+    expect(EXPECTED_API_KEYS.length).toBe(21);
   });
 
   it('should have matching ipcRenderer invoke channels in preload.ts', () => {
@@ -76,8 +82,8 @@ describe('IPC API Contract Check', () => {
     const preloadChannels = Array.from(preloadContent.matchAll(/ipcRenderer\.invoke\(['"]([^'"]+)['"]/g)).map(m => m[1]);
     const mainChannels = Array.from(mainContent.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)).map(m => m[1]);
 
-    expect(preloadChannels.length).toBe(18);
-    expect(mainChannels.length).toBe(18);
+    expect(preloadChannels.length).toBe(21);
+    expect(mainChannels.length).toBe(21);
     expect(preloadChannels.sort()).toEqual(mainChannels.sort());
   });
 });

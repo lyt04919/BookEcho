@@ -42,6 +42,11 @@ export class UserVaultDb {
         PRIMARY KEY (annotation_uuid, tag_name)
       );
 
+      CREATE TABLE IF NOT EXISTS tag_definitions (
+        tag_name TEXT PRIMARY KEY,
+        created_at INTEGER NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS color_semantics (
         color_key TEXT PRIMARY KEY,
         label TEXT NOT NULL,
@@ -170,19 +175,71 @@ export class UserVaultDb {
   }
 
   public addTag(uuid: string, tag: string): void {
-    const trimmed = tag.trim().replace(/^#/, '');
+    const trimmed = tag.trim().replace(/^#+/, '');
     if (!trimmed) return;
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT OR IGNORE INTO tag_definitions (tag_name, created_at)
+      VALUES (?, ?)
+    `).run(trimmed, now);
     this.db.prepare(`
       INSERT OR IGNORE INTO annotation_tags (annotation_uuid, tag_name, created_at)
       VALUES (?, ?, ?)
-    `).run(uuid, trimmed, Date.now());
+    `).run(uuid, trimmed, now);
   }
 
   public removeTag(uuid: string, tag: string): void {
-    const trimmed = tag.trim().replace(/^#/, '');
+    const trimmed = tag.trim().replace(/^#+/, '');
     this.db.prepare(`
       DELETE FROM annotation_tags WHERE annotation_uuid = ? AND tag_name = ?
     `).run(uuid, trimmed);
+  }
+
+  public createGlobalTag(tag: string): void {
+    const trimmed = tag.trim().replace(/^#+/, '');
+    if (!trimmed) return;
+    this.db.prepare(`
+      INSERT OR IGNORE INTO tag_definitions (tag_name, created_at)
+      VALUES (?, ?)
+    `).run(trimmed, Date.now());
+  }
+
+  public renameGlobalTag(oldTag: string, newTag: string): void {
+    const cleanOld = oldTag.trim().replace(/^#+/, '');
+    const cleanNew = newTag.trim().replace(/^#+/, '');
+    if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
+
+    const now = Date.now();
+    const tx = this.db.transaction(() => {
+      this.db.prepare(`
+        INSERT OR IGNORE INTO tag_definitions (tag_name, created_at)
+        VALUES (?, ?)
+      `).run(cleanNew, now);
+
+      this.db.prepare(`
+        DELETE FROM tag_definitions WHERE tag_name = ?
+      `).run(cleanOld);
+
+      this.db.prepare(`
+        INSERT OR IGNORE INTO annotation_tags (annotation_uuid, tag_name, created_at)
+        SELECT annotation_uuid, ?, created_at FROM annotation_tags WHERE tag_name = ?
+      `).run(cleanNew, cleanOld);
+
+      this.db.prepare(`
+        DELETE FROM annotation_tags WHERE tag_name = ?
+      `).run(cleanOld);
+    });
+    tx();
+  }
+
+  public deleteGlobalTag(tag: string): void {
+    const clean = tag.trim().replace(/^#+/, '');
+    if (!clean) return;
+    const tx = this.db.transaction(() => {
+      this.db.prepare(`DELETE FROM tag_definitions WHERE tag_name = ?`).run(clean);
+      this.db.prepare(`DELETE FROM annotation_tags WHERE tag_name = ?`).run(clean);
+    });
+    tx();
   }
 
   public getTagsForAnnotation(uuid: string): string[] {
@@ -194,7 +251,10 @@ export class UserVaultDb {
 
   public getAllTags(): string[] {
     const rows = this.db.prepare(`
-      SELECT DISTINCT tag_name as tag FROM annotation_tags ORDER BY tag_name ASC
+      SELECT tag_name as tag FROM tag_definitions
+      UNION
+      SELECT DISTINCT tag_name as tag FROM annotation_tags
+      ORDER BY tag ASC
     `).all() as { tag: string }[];
     return rows.map(r => r.tag);
   }
