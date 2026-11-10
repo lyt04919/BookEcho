@@ -1,0 +1,84 @@
+import fs from 'fs';
+import path from 'path';
+import AdmZip from 'adm-zip';
+
+export function createMockEpubDirectory(targetDir: string): string {
+  const epubDir = path.join(targetDir, 'mock_book.epub');
+  const metaInf = path.join(epubDir, 'META-INF');
+  const oebps = path.join(epubDir, 'OEBPS');
+
+  fs.mkdirSync(metaInf, { recursive: true });
+  fs.mkdirSync(oebps, { recursive: true });
+
+  // 1. container.xml
+  fs.writeFileSync(
+    path.join(metaInf, 'container.xml'),
+    `<?xml version="1.0"?>
+    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+      <rootfiles>
+        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+      </rootfiles>
+    </container>`
+  );
+
+  // 2. content.opf
+  fs.writeFileSync(
+    path.join(oebps, 'content.opf'),
+    `<?xml version="1.0" encoding="utf-8"?>
+    <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
+      <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <dc:title>模拟测试书籍</dc:title>
+      </metadata>
+      <manifest>
+        <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+        <item id="chapter1" href="ch01.xhtml" media-type="application/xhtml+xml"/>
+      </manifest>
+      <spine>
+        <itemref idref="chapter1"/>
+      </spine>
+    </package>`
+  );
+
+  // 3. toc.xhtml
+  fs.writeFileSync(
+    path.join(oebps, 'toc.xhtml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+    <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+      <body>
+        <nav epub:type="toc">
+          <ol>
+            <li><a href="ch01.xhtml">第一章：直觉与理性</a></li>
+          </ol>
+        </nav>
+      </body>
+    </html>`
+  );
+
+  // 4. ch01.xhtml (带有多个自然段)
+  fs.writeFileSync(
+    path.join(oebps, 'ch01.xhtml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+    <html xmlns="http://www.w3.org/1999/xhtml">
+      <head><title>第一章</title></head>
+      <body>
+        <h1>第一章：直觉与理性</h1>
+        <p>这是前置导读段落，阐述人类大脑的双系统决策架构背景。</p>
+        <p>心理学研究表明，直觉在日常判断中占据主导，但也会产生偏见。</p>
+        <p>系统1的运行是无意识且快速的，不怎么费脑力，没有感觉，完全处于自主控制状态。</p>
+        <p>相比之下，系统2则需要调动注意力进行深度的数理逻辑运算与权衡。</p>
+        <p>结论是，优秀的决策者必须学会察觉系统1的偏见并适时激活系统2。</p>
+      </body>
+    </html>`
+  );
+
+  return epubDir;
+}
+
+export function createMockEpubZip(targetDir: string): string {
+  const dirPath = createMockEpubDirectory(targetDir);
+  const zipPath = path.join(targetDir, 'mock_book_zipped.epub');
+  const zip = new AdmZip();
+  zip.addLocalFolder(dirPath);
+  zip.writeZip(zipPath);
+  return zipPath;
+}
