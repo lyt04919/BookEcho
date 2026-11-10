@@ -31,6 +31,7 @@ export interface AnnotationItem {
   reviewCount?: number;
   lastReviewedAtMs?: number | null;
   tags?: string[];
+  bookTitle?: string;
 }
 
 export interface HighlightContextResult {

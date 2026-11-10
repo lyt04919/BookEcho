@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
 import { BookDetailView } from './components/BookDetailView';
+import { DailyReviewView } from './components/DailyReviewView';
 import {
   BookItem,
   AnnotationItem,
@@ -29,6 +30,7 @@ export default function App() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [bookAnnotations, setBookAnnotations] = useState<AnnotationItem[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<AnnotationItem[]>([]);
   const [, setQuoteModalAnnotation] = useState<AnnotationItem | null>(null);
 
   useEffect(() => {
@@ -64,6 +66,33 @@ export default function App() {
       setBookAnnotations([]);
     }
   }, [selectedBook]);
+
+  const fetchReviewQueue = async () => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        const queue = await window.bookEchoAPI.getDailyReviewQueue();
+        setReviewQueue(queue || []);
+      } catch (err) {
+        console.warn('Failed to fetch daily review queue', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (currentTab === 'review') {
+      fetchReviewQueue();
+    }
+  }, [currentTab]);
+
+  const handleSubmitReviewResult = async (uuid: string, result: 'remembered' | 'mastered' | 'reset') => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.submitReviewResult(uuid, result);
+      } catch (err) {
+        console.error('Failed to submit review result', err);
+      }
+    }
+  };
 
   const handleSelectTab = (tab: 'books' | 'review' | 'search') => {
     setCurrentTab(tab);
@@ -242,14 +271,12 @@ export default function App() {
         )
       )}
       {currentTab === 'review' && (
-        <main className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
-          <div className="max-w-md text-center space-y-3">
-            <h1 className="text-2xl font-serif font-semibold text-paper-text dark:text-night-text">每日回顾</h1>
-            <p className="text-sm text-paper-muted dark:text-night-muted">
-              回顾卡片即将就绪
-            </p>
-          </div>
-        </main>
+        <DailyReviewView
+          queue={reviewQueue}
+          colorSemantics={colorSemantics}
+          onSubmitResult={handleSubmitReviewResult}
+          onRefreshQueue={fetchReviewQueue}
+        />
       )}
       {currentTab === 'search' && (
         <main className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
