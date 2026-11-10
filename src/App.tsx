@@ -3,6 +3,8 @@ import { Sidebar } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
 import { BookDetailView } from './components/BookDetailView';
 import { DailyReviewView } from './components/DailyReviewView';
+import { QuoteCardModal } from './components/QuoteCardModal';
+import { ExportModal } from './components/ExportModal';
 import {
   BookItem,
   AnnotationItem,
@@ -31,7 +33,8 @@ export default function App() {
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
   const [bookAnnotations, setBookAnnotations] = useState<AnnotationItem[]>([]);
   const [reviewQueue, setReviewQueue] = useState<AnnotationItem[]>([]);
-  const [, setQuoteModalAnnotation] = useState<AnnotationItem | null>(null);
+  const [quoteModalAnnotation, setQuoteModalAnnotation] = useState<AnnotationItem | null>(null);
+  const [exportModalBook, setExportModalBook] = useState<BookItem | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -137,10 +140,18 @@ export default function App() {
     }
   };
 
-  const handleExportMarkdown = async (assetId: string) => {
+  const handleExportMarkdown = (assetId: string) => {
+    const book = books.find(b => b.assetId === assetId) || selectedBook;
+    if (book) {
+      setExportModalBook(book);
+    }
+  };
+
+  const handleConfirmExport = async (format: 'standard' | 'obsidian') => {
+    if (!exportModalBook) return;
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
-        await window.bookEchoAPI.exportMarkdown(assetId, 'standard');
+        await window.bookEchoAPI.exportMarkdown(exportModalBook.assetId, format);
       } catch (err) {
         console.error('Failed to export markdown', err);
       }
@@ -287,6 +298,30 @@ export default function App() {
             </p>
           </div>
         </main>
+      )}
+      {quoteModalAnnotation && (
+        <QuoteCardModal
+          annotation={quoteModalAnnotation}
+          bookTitle={
+            quoteModalAnnotation.bookTitle ||
+            books.find(b => b.assetId === quoteModalAnnotation.assetId)?.title ||
+            selectedBook?.title ||
+            '未知书籍'
+          }
+          author={
+            books.find(b => b.assetId === quoteModalAnnotation.assetId)?.author ||
+            selectedBook?.author ||
+            '未知作者'
+          }
+          onClose={() => setQuoteModalAnnotation(null)}
+        />
+      )}
+      {exportModalBook && (
+        <ExportModal
+          bookTitle={exportModalBook.title}
+          onClose={() => setExportModalBook(null)}
+          onConfirmExport={handleConfirmExport}
+        />
       )}
     </div>
   );
