@@ -15,6 +15,7 @@ describe('App Build Artifact Integrity', () => {
       'src/components/BookDetailView.tsx',
       'src/components/HighlightCard.tsx',
       'src/components/GlobalSearchView.tsx',
+      'src/components/KnowledgeGraphView.tsx',
       'src/components/QuoteCardModal.tsx',
       'src/components/ExportModal.tsx',
       'src/components/PermissionGuide.tsx'
@@ -66,6 +67,7 @@ describe('App State and Orchestration', () => {
     expect(html).toContain('BookEcho');
     expect(html).toContain('全部书架');
     expect(html).toContain('全局搜索');
+    expect(html).toContain('知识网络');
     expect(html).toContain('我的书库');
   });
 

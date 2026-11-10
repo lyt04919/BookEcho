@@ -11,11 +11,12 @@ import {
   Bookmark,
   List,
   BarChart3,
-  ArrowLeft
+  ArrowLeft,
+  Waypoints
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
-export type NavTab = 'books' | 'search' | 'starred_notes' | 'insights' | 'tags';
+export type NavTab = 'books' | 'search' | 'starred_notes' | 'insights' | 'tags' | 'graph';
 
 export interface SidebarProps {
   currentTab: NavTab;
@@ -130,6 +131,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Search className="w-4 h-4 text-blue-500" />
               <span>全局搜索</span>
+            </button>
+
+            <button
+              onClick={() => onSelectTab('graph')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'graph' && !selectedTag
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <Waypoints className="w-4 h-4 text-amber-500" />
+              <span>知识网络</span>
             </button>
 
             <button

@@ -35,6 +35,7 @@ export interface GlobalSearchViewProps {
   onRemoveTag: (uuid: string, tag: string) => void;
   onOpenQuoteModal: (annotation: AnnotationItem) => void;
   onRequestContext: (annotation: AnnotationItem) => Promise<HighlightContextResult>;
+  onOpenInGraph?: (annotation: AnnotationItem) => void;
 }
 
 export const GlobalSearchView: React.FC<GlobalSearchViewProps> = ({
@@ -52,7 +53,8 @@ export const GlobalSearchView: React.FC<GlobalSearchViewProps> = ({
   onAddTag,
   onRemoveTag,
   onOpenQuoteModal,
-  onRequestContext
+  onRequestContext,
+  onOpenInGraph
 }) => {
   const [selectedBookId, setSelectedBookId] = useState<string>('all');
   const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
@@ -391,6 +393,8 @@ export const GlobalSearchView: React.FC<GlobalSearchViewProps> = ({
                   annotation={item}
                   colorSemantics={colorSemantics}
                   availableTags={availableTags}
+                  allAnnotations={annotations}
+                  onOpenInGraph={onOpenInGraph}
                   onManageTags={onManageTags}
                   onToggleStar={onToggleStar}
                   onUpdateCustomNote={onUpdateCustomNote}

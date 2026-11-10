@@ -15,7 +15,8 @@ import {
   Plus,
   Pencil,
   Trash2,
-  X
+  X,
+  Waypoints
 } from 'lucide-react';
 
 export interface TagTopicViewProps {
@@ -36,6 +37,8 @@ export interface TagTopicViewProps {
   onRemoveTag: (uuid: string, tag: string) => void;
   onOpenQuoteModal: (annotation: AnnotationItem) => void;
   onRequestContext: (annotation: AnnotationItem) => Promise<HighlightContextResult>;
+  onOpenInGraph?: (annotation: AnnotationItem) => void;
+  onSwitchToGraph?: () => void;
 }
 
 export function formatTagTopicMarkdown(
@@ -107,7 +110,9 @@ export const TagTopicView: React.FC<TagTopicViewProps> = ({
   onAddTag,
   onRemoveTag,
   onOpenQuoteModal,
-  onRequestContext
+  onRequestContext,
+  onOpenInGraph,
+  onSwitchToGraph
 }) => {
   const [copied, setCopied] = useState(false);
   const [newTagName, setNewTagName] = useState('');
@@ -201,8 +206,19 @@ export const TagTopicView: React.FC<TagTopicViewProps> = ({
           </p>
         </div>
 
-        {/* 新建全局标签输入框 */}
-        <div className="flex items-center gap-2">
+        {/* 右上角操作区：新建全局标签与切换网络图谱 */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onSwitchToGraph && (
+            <button
+              onClick={onSwitchToGraph}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text hover:text-paper-terracotta dark:hover:text-night-terracotta text-xs font-medium shadow-2xs hover:shadow-sm transition-all"
+              title="切换至 Obsidian 式网状关系图谱"
+            >
+              <Waypoints className="w-3.5 h-3.5 text-amber-500" />
+              <span>知识网络图谱</span>
+            </button>
+          )}
+
           <div className="relative">
             <input
               type="text"
@@ -212,7 +228,7 @@ export const TagTopicView: React.FC<TagTopicViewProps> = ({
                 if (e.key === 'Enter') handleCreateTag();
               }}
               placeholder="输入新标签名（如：心智模型）"
-              className="pl-3 pr-3 py-2 text-xs rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text placeholder:text-paper-muted dark:placeholder:text-night-muted focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta w-52"
+              className="pl-3 pr-3 py-2 text-xs rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text placeholder:text-paper-muted dark:placeholder:text-night-muted focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta w-44"
             />
           </div>
           <button
@@ -421,6 +437,8 @@ export const TagTopicView: React.FC<TagTopicViewProps> = ({
                             annotation={anno}
                             colorSemantics={colorSemantics}
                             availableTags={allTags}
+                            allAnnotations={annotations}
+                            onOpenInGraph={onOpenInGraph}
                             onToggleStar={onToggleStar}
                             onUpdateCustomNote={onUpdateCustomNote}
                             onAddTag={onAddTag}

@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AnnotationItem, ColorSemanticConfig, HighlightContextResult } from '../../electron/types/ipc';
-import { Star, MessageSquare, ChevronDown, ChevronUp, Image, Tag, Plus, Check, Copy } from 'lucide-react';
+import { Star, MessageSquare, ChevronDown, ChevronUp, Image, Tag, Plus, Check, Copy, Waypoints, ArrowUpRight } from 'lucide-react';
 
 export interface HighlightCardProps {
   annotation: AnnotationItem;
   colorSemantics: ColorSemanticConfig[];
   availableTags?: string[];
+  allAnnotations?: AnnotationItem[];
+  onOpenInGraph?: (annotation: AnnotationItem) => void;
   onManageTags?: () => void;
   onToggleStar: (uuid: string) => void;
   onUpdateCustomNote: (uuid: string, note: string) => void;
@@ -19,6 +21,8 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   annotation,
   colorSemantics,
   availableTags = [],
+  allAnnotations = [],
+  onOpenInGraph,
   onManageTags,
   onToggleStar,
   onUpdateCustomNote,
@@ -34,6 +38,17 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [contextData, setContextData] = useState<HighlightContextResult | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [isLinkedDrawerOpen, setIsLinkedDrawerOpen] = useState(false);
+
+  // 计算共享标签的同门高亮
+  const linkedHighlights = useMemo(() => {
+    const myTags = annotation.tags || [];
+    if (myTags.length === 0 || allAnnotations.length === 0) return [];
+    const tagSet = new Set(myTags);
+    return allAnnotations.filter(
+      a => a.uuid !== annotation.uuid && (a.tags || []).some(t => tagSet.has(t))
+    );
+  }, [annotation.tags, annotation.uuid, allAnnotations]);
 
   const semantic = colorSemantics.find(s => s.colorKey === annotation.colorKey);
   const colorHex = semantic?.hexColor || '#F5A623';
@@ -318,6 +333,56 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
                 >
                   去新建标签 →
                 </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 知识网络互联条（类似 Obsidian 局部网络连接） */}
+      {linkedHighlights.length > 0 && (
+        <div className="ml-2 mt-2 pt-2 border-t border-paper-border/30 dark:border-night-border/30">
+          <div className="flex items-center justify-between text-[11px] text-paper-muted dark:text-night-muted">
+            <button
+              onClick={() => setIsLinkedDrawerOpen(prev => !prev)}
+              className="flex items-center gap-1.5 hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors text-left"
+            >
+              <Waypoints className="w-3.5 h-3.5 text-paper-terracotta flex-shrink-0" />
+              <span>
+                知识网络：通过共同标签与 <strong className="text-paper-text dark:text-night-text">{linkedHighlights.length}</strong> 条跨书思考相连
+              </span>
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${isLinkedDrawerOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {onOpenInGraph && (
+              <button
+                onClick={() => onOpenInGraph(annotation)}
+                className="flex items-center gap-0.5 text-paper-terracotta dark:text-night-terracotta hover:underline ml-2 flex-shrink-0 font-medium"
+                title="在知识图谱中查看此节点"
+              >
+                <span>在图谱中定位</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* 展开相关的同门高亮预览 */}
+          {isLinkedDrawerOpen && (
+            <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-paper-terracotta/40 dark:border-night-terracotta/40">
+              {linkedHighlights.slice(0, 3).map(h => (
+                <div key={h.uuid} className="text-[11px] leading-relaxed">
+                  <span className="font-serif font-medium text-paper-text/90 dark:text-night-text/90">
+                    《{h.bookTitle || '未知书名'}》
+                  </span>
+                  <span className="text-paper-muted dark:text-night-muted">: “{h.selectedText.length > 45 ? h.selectedText.slice(0, 45) + '...' : h.selectedText}”</span>
+                </div>
+              ))}
+              {linkedHighlights.length > 3 && (
+                <p className="text-[10px] text-paper-muted/70">
+                  还有 {linkedHighlights.length - 3} 条连接，可在网络图谱中全局漫游
+                </p>
               )}
             </div>
           )}

@@ -42,6 +42,7 @@ describe('Sidebar Component', () => {
     expect(html).toContain('全部书架');
     expect(html).toContain('批注与星标');
     expect(html).toContain('全局搜索');
+    expect(html).toContain('知识网络');
     expect(html).toContain('阅读足迹');
     expect(html).not.toContain('每日回顾');
   });
@@ -55,6 +56,9 @@ describe('Sidebar Component', () => {
 
     const searchHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="search" />);
     expect(searchHtml).toContain('全局搜索');
+
+    const graphHtml = renderToStaticMarkup(<Sidebar {...defaultProps} currentTab="graph" />);
+    expect(graphHtml).toContain('知识网络');
   });
 
   it('should render book notes shortcut list when books with highlights are provided', () => {
@@ -163,7 +167,7 @@ describe('Sidebar Component', () => {
 
     // 导航区
     const nav = topDiv.props.children[2];
-    const [booksBtn, starredBtn, searchBtn] = nav.props.children;
+    const [booksBtn, starredBtn, searchBtn, graphBtn] = nav.props.children;
 
     booksBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('books');
@@ -173,6 +177,9 @@ describe('Sidebar Component', () => {
 
     searchBtn.props.onClick();
     expect(onSelectTab).toHaveBeenCalledWith('search');
+
+    graphBtn.props.onClick();
+    expect(onSelectTab).toHaveBeenCalledWith('graph');
 
     // 底部系统操作
     const [refreshBtn, customDirBtn, darkModeBtn] = bottomDiv.props.children;

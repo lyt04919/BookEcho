@@ -18,6 +18,7 @@ import { HighlightCard } from './components/HighlightCard';
 import { TagTopicView } from './components/TagTopicView';
 import { InsightsView } from './components/InsightsView';
 import { GlobalSearchView } from './components/GlobalSearchView';
+import { KnowledgeGraphView } from './components/KnowledgeGraphView';
 import { MessageSquareQuote, Download, Sparkles } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
@@ -51,6 +52,15 @@ export default function App() {
   const [onlyChaptersWithNotes, setOnlyChaptersWithNotes] = useState(false);
   const [readingChapterContent, setReadingChapterContent] = useState<ChapterContentResult | null>(null);
   const [isLoadingChapterContent, setIsLoadingChapterContent] = useState(false);
+  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
+
+  // 跳转到知识网络图谱并聚焦指定高亮节点
+  const handleOpenInGraph = (annotation: AnnotationItem) => {
+    setSelectedBook(null);
+    setSelectedTag(null);
+    setSelectedGraphNodeId(`anno:${annotation.uuid}`);
+    setCurrentTab('graph');
+  };
 
   // 初始化加载数据
   const loadInitialData = async () => {
@@ -490,6 +500,32 @@ export default function App() {
             onRemoveTag={handleRemoveTag}
             onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
             onRequestContext={handleRequestContext}
+            onOpenInGraph={handleOpenInGraph}
+            onSwitchToGraph={() => {
+              setSelectedBook(null);
+              setSelectedTag(null);
+              setCurrentTab('graph');
+            }}
+          />
+        ) : currentTab === 'graph' ? (
+          <KnowledgeGraphView
+            annotations={allAnnotations}
+            books={books}
+            colorSemantics={colorSemantics}
+            availableTags={tags}
+            onSelectBook={handleSelectBook}
+            onManageTags={() => {
+              setSelectedBook(null);
+              setCurrentTab('tags');
+            }}
+            onToggleStar={handleToggleStar}
+            onUpdateCustomNote={handleUpdateCustomNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
+            onRequestContext={handleRequestContext}
+            initialFocusedNodeId={selectedGraphNodeId}
+            isDarkMode={isDarkMode}
           />
         ) : currentTab === 'insights' ? (
           <InsightsView
@@ -518,6 +554,7 @@ export default function App() {
             onRemoveTag={handleRemoveTag}
             onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
             onRequestContext={handleRequestContext}
+            onOpenInGraph={handleOpenInGraph}
           />
         ) : currentTab === 'starred_notes' ? (
           /* 批注与星标独立专属汇总馆 */
@@ -576,6 +613,8 @@ export default function App() {
                       annotation={anno}
                       colorSemantics={colorSemantics}
                       availableTags={tags}
+                      allAnnotations={allAnnotations}
+                      onOpenInGraph={handleOpenInGraph}
                       onManageTags={() => {
                         setSelectedBook(null);
                         setCurrentTab('tags');
@@ -598,6 +637,8 @@ export default function App() {
             annotations={currentAnnotations}
             colorSemantics={colorSemantics}
             availableTags={tags}
+            allAnnotations={allAnnotations}
+            onOpenInGraph={handleOpenInGraph}
             onManageTags={() => {
               setSelectedBook(null);
               setCurrentTab('tags');
