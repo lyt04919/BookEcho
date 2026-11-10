@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
-import { BookItem, ColorSemanticConfig, HighlightColor } from '../electron/types/ipc';
+import { BookDetailView } from './components/BookDetailView';
+import {
+  BookItem,
+  AnnotationItem,
+  ColorSemanticConfig,
+  HighlightColor,
+  HighlightContextResult
+} from '../electron/types/ipc';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
@@ -21,6 +28,8 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [books, setBooks] = useState<BookItem[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
+  const [bookAnnotations, setBookAnnotations] = useState<AnnotationItem[]>([]);
+  const [, setQuoteModalAnnotation] = useState<AnnotationItem | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -43,6 +52,18 @@ export default function App() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (selectedBook && typeof window !== 'undefined' && window.bookEchoAPI) {
+      window.bookEchoAPI.getBookAnnotations(selectedBook.assetId).then(annos => {
+        setBookAnnotations(annos || []);
+      }).catch(err => {
+        console.warn('Failed to fetch annotations for book', err);
+      });
+    } else {
+      setBookAnnotations([]);
+    }
+  }, [selectedBook]);
 
   const handleSelectTab = (tab: 'books' | 'review' | 'search') => {
     setCurrentTab(tab);
@@ -77,6 +98,111 @@ export default function App() {
     });
   };
 
+  const handleOpenInAppleBooks = async (assetId: string, epubPath?: string | null) => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.openInAppleBooks(assetId, epubPath);
+      } catch (err) {
+        console.error('Failed to open in Apple Books', err);
+      }
+    }
+  };
+
+  const handleExportMarkdown = async (assetId: string) => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.exportMarkdown(assetId, 'standard');
+      } catch (err) {
+        console.error('Failed to export markdown', err);
+      }
+    }
+  };
+
+  const handleToggleStar = async (uuid: string) => {
+    const target = bookAnnotations.find(a => a.uuid === uuid);
+    if (!target) return;
+    const newStarred = !target.isStarred;
+    setBookAnnotations(prev => prev.map(a => a.uuid === uuid ? { ...a, isStarred: newStarred } : a));
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.updateAnnotationMeta(uuid, { isStarred: newStarred });
+      } catch (err) {
+        console.error('Failed to toggle star', err);
+      }
+    }
+  };
+
+  const handleUpdateCustomNote = async (uuid: string, note: string) => {
+    setBookAnnotations(prev => prev.map(a => a.uuid === uuid ? { ...a, customNote: note } : a));
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.updateAnnotationMeta(uuid, { customNote: note });
+      } catch (err) {
+        console.error('Failed to update custom note', err);
+      }
+    }
+  };
+
+  const handleAddTag = async (uuid: string, tag: string) => {
+    setBookAnnotations(prev => prev.map(a => {
+      if (a.uuid === uuid) {
+        const existingTags = a.tags || [];
+        if (!existingTags.includes(tag)) {
+          return { ...a, tags: [...existingTags, tag] };
+        }
+      }
+      return a;
+    }));
+    setTags(prev => prev.includes(tag) ? prev : [...prev, tag]);
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.addTag(uuid, tag);
+      } catch (err) {
+        console.error('Failed to add tag', err);
+      }
+    }
+  };
+
+  const handleRemoveTag = async (uuid: string, tag: string) => {
+    setBookAnnotations(prev => prev.map(a => {
+      if (a.uuid === uuid) {
+        return { ...a, tags: (a.tags || []).filter(t => t !== tag) };
+      }
+      return a;
+    }));
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.removeTag(uuid, tag);
+      } catch (err) {
+        console.error('Failed to remove tag', err);
+      }
+    }
+  };
+
+  const handleRequestContext = async (annotation: AnnotationItem): Promise<HighlightContextResult> => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      return await window.bookEchoAPI.getHighlightContext(
+        annotation.assetId,
+        annotation.locationCfi || '',
+        annotation.selectedText
+      );
+    }
+    return {
+      available: false,
+      reason: 'NOT_FOUND',
+      beforeParagraphs: [],
+      currentParagraph: '',
+      selectedText: annotation.selectedText,
+      afterParagraphs: []
+    };
+  };
+
+  const displayedAnnotations = bookAnnotations.filter(a => {
+    if (selectedColor && a.colorKey !== selectedColor) return false;
+    if (selectedTag && (!a.tags || !a.tags.includes(selectedTag))) return false;
+    return true;
+  });
+
   return (
     <div className={`flex h-screen w-screen overflow-hidden ${isDarkMode ? 'dark bg-night-bg text-night-text' : 'bg-paper-bg text-paper-text'}`}>
       <Sidebar
@@ -94,15 +220,20 @@ export default function App() {
       />
       {currentTab === 'books' && (
         selectedBook ? (
-          <main className="flex-1 flex flex-col p-8 overflow-y-auto select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
-            <button
-              onClick={() => setSelectedBook(null)}
-              className="self-start text-sm text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta mb-4 transition-colors"
-            >
-              &larr; 返回书架
-            </button>
-            <h2 className="text-2xl font-serif font-bold text-paper-text dark:text-night-text">{selectedBook.title}</h2>
-          </main>
+          <BookDetailView
+            book={selectedBook}
+            annotations={displayedAnnotations}
+            colorSemantics={colorSemantics}
+            onBack={() => setSelectedBook(null)}
+            onOpenInAppleBooks={handleOpenInAppleBooks}
+            onExportMarkdown={handleExportMarkdown}
+            onToggleStar={handleToggleStar}
+            onUpdateCustomNote={handleUpdateCustomNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onOpenQuoteModal={setQuoteModalAnnotation}
+            onRequestContext={handleRequestContext}
+          />
         ) : (
           <BookshelfView
             books={books}
