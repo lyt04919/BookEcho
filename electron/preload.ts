@@ -3,7 +3,7 @@ import { BookEchoAPI, HighlightColor } from './types/ipc';
 
 const api: BookEchoAPI = {
   getBooks: () => ipcRenderer.invoke('books:getAll'),
-  getBookAnnotations: (assetId: string) => ipcRenderer.invoke('annotations:getByBook', assetId),
+  getBookAnnotations: (assetId?: string) => ipcRenderer.invoke('annotations:getByBook', assetId),
   searchAnnotations: (keyword: string) => ipcRenderer.invoke('annotations:search', keyword),
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) =>
     ipcRenderer.invoke('context:get', assetId, locationCfi, selectedText),

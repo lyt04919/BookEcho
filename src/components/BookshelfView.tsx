@@ -1,27 +1,233 @@
 import React, { useState } from 'react';
-import { BookItem } from '../../electron/types/ipc';
-import { Book, Highlighter, Clock, ArrowUpDown } from 'lucide-react';
+import {
+  BookItem,
+  AnnotationItem,
+  ColorSemanticConfig,
+  HighlightColor,
+  HighlightContextResult
+} from '../../electron/types/ipc';
+import {
+  Book,
+  Highlighter,
+  Clock,
+  ArrowUpDown,
+  Tag,
+  X,
+  LayoutGrid,
+  ListFilter,
+  SearchX
+} from 'lucide-react';
+import { HighlightCard } from './HighlightCard';
 
 export interface BookshelfViewProps {
   books: BookItem[];
   onSelectBook: (book: BookItem) => void;
   defaultSortBy?: 'recent' | 'highlights' | 'title';
+  selectedColor?: HighlightColor | null;
+  selectedTag?: string | null;
+  colorSemantics?: ColorSemanticConfig[];
+  matchingAnnotations?: AnnotationItem[];
+  filteredCountMap?: Record<string, number>;
+  onClearFilter?: () => void;
+  onToggleStar?: (uuid: string) => void;
+  onUpdateCustomNote?: (uuid: string, note: string) => void;
+  onAddTag?: (uuid: string, tag: string) => void;
+  onRemoveTag?: (uuid: string, tag: string) => void;
+  onOpenQuoteModal?: (annotation: AnnotationItem) => void;
+  onRequestContext?: (annotation: AnnotationItem) => Promise<HighlightContextResult>;
 }
 
 export const BookshelfView: React.FC<BookshelfViewProps> = ({
   books,
   onSelectBook,
-  defaultSortBy = 'recent'
+  defaultSortBy = 'recent',
+  selectedColor = null,
+  selectedTag = null,
+  colorSemantics = [],
+  matchingAnnotations = [],
+  filteredCountMap,
+  onClearFilter,
+  onToggleStar,
+  onUpdateCustomNote,
+  onAddTag,
+  onRemoveTag,
+  onOpenQuoteModal,
+  onRequestContext
 }) => {
   const [sortBy, setSortBy] = useState<'recent' | 'highlights' | 'title'>(defaultSortBy);
+  const [viewMode, setViewMode] = useState<'books' | 'highlights'>('books');
+
+  const isFiltering = Boolean(selectedColor || selectedTag);
+  const currentSemantic = selectedColor ? colorSemantics.find(s => s.colorKey === selectedColor) : null;
 
   const sortedBooks = [...books].sort((a, b) => {
-    if (sortBy === 'highlights') return b.highlightsCount - a.highlightsCount;
+    if (sortBy === 'highlights') {
+      const countA = isFiltering && filteredCountMap ? (filteredCountMap[a.assetId] ?? 0) : a.highlightsCount;
+      const countB = isFiltering && filteredCountMap ? (filteredCountMap[b.assetId] ?? 0) : b.highlightsCount;
+      return countB - countA;
+    }
     if (sortBy === 'title') return a.title.localeCompare(b.title, 'zh-CN');
     return (b.lastOpenDateMs || 0) - (a.lastOpenDateMs || 0);
   });
 
   const totalHighlights = books.reduce((acc, b) => acc + (b.highlightsCount || 0), 0);
+  const totalMatchingHighlights = matchingAnnotations.length > 0
+    ? matchingAnnotations.length
+    : books.reduce((acc, b) => acc + (filteredCountMap?.[b.assetId] ?? (isFiltering ? 0 : b.highlightsCount)), 0);
+
+  const renderBookCard = (book: BookItem) => {
+    const progressPercent =
+      typeof book.readingProgress === 'number' && book.readingProgress > 0
+        ? Math.min(100, Math.round(book.readingProgress <= 1 ? book.readingProgress * 100 : book.readingProgress))
+        : 0;
+
+    const displayHighlightCount = isFiltering && filteredCountMap
+      ? (filteredCountMap[book.assetId] ?? 0)
+      : book.highlightsCount;
+
+    return (
+      <div
+        key={book.assetId}
+        data-testid={`book-card-${book.assetId}`}
+        onClick={() => onSelectBook(book)}
+        className="group cursor-pointer flex flex-col bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-xl p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-paper-terracotta/40 dark:hover:border-night-terracotta/40"
+      >
+        {/* 封面拟真区域 */}
+        <div className="aspect-[3/4] w-full rounded-lg bg-paper-drawer dark:bg-night-drawer border border-paper-border/60 dark:border-night-border flex items-center justify-center overflow-hidden mb-3 relative group-hover:border-paper-terracotta/40 dark:group-hover:border-night-terracotta/40 transition-colors">
+          {book.coverUrl ? (
+            <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="p-4 text-center">
+              <Book className="w-8 h-8 mx-auto text-paper-muted/60 dark:text-night-muted/60 mb-2" />
+              <span className="font-serif text-xs font-semibold text-paper-text dark:text-night-text line-clamp-3">
+                {book.title}
+              </span>
+            </div>
+          )}
+
+          {/* 划线数量标签 */}
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white px-2 py-0.5 rounded text-[11px]">
+            {isFiltering && selectedColor && currentSemantic ? (
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: currentSemantic.hexColor }} />
+            ) : (
+              <Highlighter className="w-3 h-3 text-amber-400" />
+            )}
+            <span>{displayHighlightCount}</span>
+          </div>
+
+          {/* 阅读进度条 (封面底部) */}
+          {progressPercent > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 overflow-hidden">
+              <div
+                className="h-full bg-paper-terracotta dark:bg-night-terracotta transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 书籍信息 */}
+        <h3 className="font-serif text-sm font-bold text-paper-text dark:text-night-text line-clamp-1 group-hover:text-paper-terracotta dark:group-hover:text-night-terracotta transition-colors">
+          {book.title}
+        </h3>
+        <p className="text-xs text-paper-muted dark:text-night-muted line-clamp-1 mt-0.5">
+          {book.author || '未知作者'}
+        </p>
+
+        {(book.lastOpenDateMs || progressPercent > 0) && (
+          <div className="flex items-center justify-between text-[11px] text-paper-muted/80 dark:text-night-muted/80 mt-2 pt-2 border-t border-paper-border/40 dark:border-night-border/40">
+            {book.lastOpenDateMs ? (
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                <span>{new Date(book.lastOpenDateMs).toLocaleDateString('zh-CN')}</span>
+              </div>
+            ) : (
+              <span />
+            )}
+            {progressPercent > 0 && (
+              <span className="text-[10px] font-mono text-paper-muted dark:text-night-muted font-medium">
+                {progressPercent}%
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderFilterBanner = () => (
+    <div
+      data-testid="filter-banner"
+      className="flex flex-wrap items-center justify-between gap-3 p-3.5 mb-6 rounded-xl bg-paper-drawer dark:bg-night-drawer border border-paper-border dark:border-night-border"
+    >
+      <div className="flex items-center gap-2 text-xs flex-wrap">
+        <span className="text-paper-muted dark:text-night-muted font-medium">当前筛选:</span>
+        {selectedColor && currentSemantic && (
+          <span
+            data-testid="active-color-filter"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-night-card border border-paper-border dark:border-night-border font-medium text-paper-text dark:text-night-text shadow-sm"
+          >
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: currentSemantic.hexColor }} />
+            <span>{currentSemantic.label}</span>
+          </span>
+        )}
+        {selectedTag && (
+          <span
+            data-testid="active-tag-filter"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-paper-terracotta dark:bg-night-terracotta text-white font-medium text-xs shadow-sm"
+          >
+            <Tag className="w-3 h-3" />
+            <span>#{selectedTag}</span>
+          </span>
+        )}
+        <span className="text-paper-muted dark:text-night-muted ml-1">
+          (共匹配到 {books.length} 本书 · {totalMatchingHighlights} 条笔记)
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {matchingAnnotations && matchingAnnotations.length > 0 && (
+          <div className="flex items-center bg-white dark:bg-night-card rounded-lg p-0.5 border border-paper-border/60 dark:border-night-border text-xs">
+            <button
+              data-testid="switch-view-books"
+              onClick={() => setViewMode('books')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                viewMode === 'books'
+                  ? 'bg-paper-drawer dark:bg-night-drawer font-medium text-paper-text dark:text-night-text shadow-xs'
+                  : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>书籍网格 ({books.length})</span>
+            </button>
+            <button
+              data-testid="switch-view-highlights"
+              onClick={() => setViewMode('highlights')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                viewMode === 'highlights'
+                  ? 'bg-paper-drawer dark:bg-night-drawer font-medium text-paper-text dark:text-night-text shadow-xs'
+                  : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              <span>全部高亮 ({totalMatchingHighlights})</span>
+            </button>
+          </div>
+        )}
+
+        {onClearFilter && (
+          <button
+            data-testid="clear-filter-btn"
+            onClick={onClearFilter}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg text-paper-muted dark:text-night-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>清除筛选</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
@@ -30,49 +236,116 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
         <div>
           <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text">我的书库</h2>
           <p className="text-sm text-paper-muted dark:text-night-muted mt-1">
-            共收录 {books.length} 本书 · 累计 {totalHighlights} 条高亮与思考
+            {isFiltering
+              ? `筛选结果: ${books.length} 本书 · 累计 ${totalMatchingHighlights} 条相关笔记`
+              : `共收录 ${books.length} 本书 · 累计 ${totalHighlights} 条高亮与思考`}
           </p>
         </div>
 
         {/* 排序切换 */}
-        <div className="flex items-center gap-2 text-xs text-paper-muted dark:text-night-muted">
-          <ArrowUpDown className="w-3.5 h-3.5" />
-          <span>排序方式:</span>
-          <button
-            onClick={() => setSortBy('recent')}
-            className={`px-2.5 py-1 rounded transition-colors ${
-              sortBy === 'recent'
-                ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
-                : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
-            }`}
-          >
-            最近阅读
-          </button>
-          <button
-            onClick={() => setSortBy('highlights')}
-            className={`px-2.5 py-1 rounded transition-colors ${
-              sortBy === 'highlights'
-                ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
-                : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
-            }`}
-          >
-            笔记数量
-          </button>
-          <button
-            onClick={() => setSortBy('title')}
-            className={`px-2.5 py-1 rounded transition-colors ${
-              sortBy === 'title'
-                ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
-                : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
-            }`}
-          >
-            书名
-          </button>
-        </div>
+        {viewMode === 'books' && (
+          <div className="flex items-center gap-2 text-xs text-paper-muted dark:text-night-muted">
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            <span>排序方式:</span>
+            <button
+              onClick={() => setSortBy('recent')}
+              className={`px-2.5 py-1 rounded transition-colors ${
+                sortBy === 'recent'
+                  ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
+                  : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              最近阅读
+            </button>
+            <button
+              onClick={() => setSortBy('highlights')}
+              className={`px-2.5 py-1 rounded transition-colors ${
+                sortBy === 'highlights'
+                  ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
+                  : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              笔记数量
+            </button>
+            <button
+              onClick={() => setSortBy('title')}
+              className={`px-2.5 py-1 rounded transition-colors ${
+                sortBy === 'title'
+                  ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
+                  : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+            >
+              书名
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 书籍网格与空状态 */}
-      {sortedBooks.length === 0 ? (
+      {isFiltering ? (
+        <div>
+          {renderFilterBanner()}
+          {viewMode === 'highlights' && matchingAnnotations && matchingAnnotations.length > 0 ? (
+            <div className="space-y-4 max-w-4xl mx-auto">
+              {matchingAnnotations.map(anno => (
+                <div key={anno.uuid} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-paper-muted dark:text-night-muted px-1">
+                    <span
+                      onClick={() => {
+                        const matchedBook = books.find(b => b.assetId === anno.assetId);
+                        if (matchedBook) onSelectBook(matchedBook);
+                      }}
+                      className="cursor-pointer hover:text-paper-terracotta dark:hover:text-night-terracotta font-serif font-medium"
+                    >
+                      《{anno.bookTitle || '未知书籍'}》 · {anno.chapterTitle || '默认章节'}
+                    </span>
+                  </div>
+                  <HighlightCard
+                    annotation={anno}
+                    colorSemantics={colorSemantics}
+                    onToggleStar={onToggleStar || (() => {})}
+                    onUpdateCustomNote={onUpdateCustomNote || (() => {})}
+                    onAddTag={onAddTag || (() => {})}
+                    onRemoveTag={onRemoveTag || (() => {})}
+                    onOpenQuoteModal={onOpenQuoteModal || (() => {})}
+                    onRequestContext={onRequestContext || (async () => ({
+                      available: false,
+                      reason: 'NOT_FOUND',
+                      beforeParagraphs: [],
+                      currentParagraph: '',
+                      selectedText: anno.selectedText,
+                      afterParagraphs: []
+                    }))}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : sortedBooks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <SearchX className="w-12 h-12 text-paper-muted/40 dark:text-night-muted/40 mb-3" />
+              <p className="text-base font-serif font-medium text-paper-text dark:text-night-text">
+                未找到包含该筛选条件的书籍
+              </p>
+              <p className="text-xs text-paper-muted dark:text-night-muted mt-1 mb-4">
+                当前书库中没有任何划线符合该色彩或标签
+              </p>
+              {onClearFilter && (
+                <button
+                  data-testid="empty-clear-filter-btn"
+                  onClick={onClearFilter}
+                  className="px-4 py-1.5 text-xs font-medium rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white shadow-sm hover:opacity-90 transition-opacity"
+                >
+                  清除筛选，查看全部书籍
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {sortedBooks.map(renderBookCard)}
+            </div>
+          )}
+        </div>
+      ) : sortedBooks.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Book className="w-12 h-12 text-paper-muted/40 dark:text-night-muted/40 mb-3" />
           <p className="text-base font-serif font-medium text-paper-text dark:text-night-text">暂无书籍</p>
@@ -82,77 +355,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {sortedBooks.map(book => {
-            const progressPercent =
-              typeof book.readingProgress === 'number' && book.readingProgress > 0
-                ? Math.min(100, Math.round(book.readingProgress <= 1 ? book.readingProgress * 100 : book.readingProgress))
-                : 0;
-
-            return (
-              <div
-                key={book.assetId}
-                data-testid={`book-card-${book.assetId}`}
-                onClick={() => onSelectBook(book)}
-                className="group cursor-pointer flex flex-col bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-xl p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-paper-terracotta/40 dark:hover:border-night-terracotta/40"
-              >
-                {/* 封面拟真区域 */}
-                <div className="aspect-[3/4] w-full rounded-lg bg-paper-drawer dark:bg-night-drawer border border-paper-border/60 dark:border-night-border flex items-center justify-center overflow-hidden mb-3 relative group-hover:border-paper-terracotta/40 dark:group-hover:border-night-terracotta/40 transition-colors">
-                  {book.coverUrl ? (
-                    <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="p-4 text-center">
-                      <Book className="w-8 h-8 mx-auto text-paper-muted/60 dark:text-night-muted/60 mb-2" />
-                      <span className="font-serif text-xs font-semibold text-paper-text dark:text-night-text line-clamp-3">
-                        {book.title}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* 划线数量标签 */}
-                  <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white px-2 py-0.5 rounded text-[11px]">
-                    <Highlighter className="w-3 h-3 text-amber-400" />
-                    <span>{book.highlightsCount}</span>
-                  </div>
-
-                  {/* 阅读进度条 (封面底部) */}
-                  {progressPercent > 0 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 overflow-hidden">
-                      <div
-                        className="h-full bg-paper-terracotta dark:bg-night-terracotta transition-all duration-300"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* 书籍信息 */}
-                <h3 className="font-serif text-sm font-bold text-paper-text dark:text-night-text line-clamp-1 group-hover:text-paper-terracotta dark:group-hover:text-night-terracotta transition-colors">
-                  {book.title}
-                </h3>
-                <p className="text-xs text-paper-muted dark:text-night-muted line-clamp-1 mt-0.5">
-                  {book.author || '未知作者'}
-                </p>
-
-                {(book.lastOpenDateMs || progressPercent > 0) && (
-                  <div className="flex items-center justify-between text-[11px] text-paper-muted/80 dark:text-night-muted/80 mt-2 pt-2 border-t border-paper-border/40 dark:border-night-border/40">
-                    {book.lastOpenDateMs ? (
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{new Date(book.lastOpenDateMs).toLocaleDateString('zh-CN')}</span>
-                      </div>
-                    ) : (
-                      <span />
-                    )}
-                    {progressPercent > 0 && (
-                      <span className="text-[10px] font-mono text-paper-muted dark:text-night-muted font-medium">
-                        {progressPercent}%
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {sortedBooks.map(renderBookCard)}
         </div>
       )}
     </div>

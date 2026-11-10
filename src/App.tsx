@@ -40,21 +40,24 @@ export default function App() {
   const [activeQuoteItem, setActiveQuoteItem] = useState<AnnotationItem | null>(null);
   const [exportBookAssetId, setExportBookAssetId] = useState<string | null>(null);
   const [hasPermissionError, setHasPermissionError] = useState(false);
+  const [allAnnotations, setAllAnnotations] = useState<AnnotationItem[]>([]);
 
   // 初始化加载数据
   const loadInitialData = async () => {
     try {
       if (typeof window !== 'undefined' && window.bookEchoAPI) {
-        const [fetchedBooks, semantics, fetchedTags] = await Promise.all([
+        const [fetchedBooks, semantics, fetchedTags, allAnnos] = await Promise.all([
           window.bookEchoAPI.getBooks(),
           window.bookEchoAPI.getColorSemantics(),
-          window.bookEchoAPI.getAllTags()
+          window.bookEchoAPI.getAllTags(),
+          window.bookEchoAPI.getBookAnnotations()
         ]);
         setBooks(fetchedBooks || []);
         if (semantics && semantics.length > 0) {
           setColorSemantics(semantics);
         }
         setTags(fetchedTags || []);
+        setAllAnnotations(allAnnos || []);
         setHasPermissionError(false);
       }
     } catch (e) {
@@ -133,10 +136,13 @@ export default function App() {
 
   // 更新星标
   const handleToggleStar = async (uuid: string) => {
-    const item = currentAnnotations.find(a => a.uuid === uuid);
+    const item = currentAnnotations.find(a => a.uuid === uuid) || allAnnotations.find(a => a.uuid === uuid);
     if (!item) return;
     const nextStarred = !item.isStarred;
     setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
+    );
+    setAllAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -151,6 +157,9 @@ export default function App() {
   // 更新延伸思考
   const handleUpdateCustomNote = async (uuid: string, note: string) => {
     setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
+    );
+    setAllAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -173,6 +182,15 @@ export default function App() {
         return a;
       })
     );
+    setAllAnnotations(prev =>
+      prev.map(a => {
+        if (a.uuid === uuid) {
+          const prevTags = a.tags || [];
+          return prevTags.includes(tag) ? a : { ...a, tags: [...prevTags, tag] };
+        }
+        return a;
+      })
+    );
     setTags(prev => (prev.includes(tag) ? prev : [...prev, tag]));
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -187,6 +205,9 @@ export default function App() {
 
   const handleRemoveTag = async (uuid: string, tag: string) => {
     setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
+    );
+    setAllAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -224,12 +245,32 @@ export default function App() {
     };
   };
 
-  // 过滤后的高亮列表（按色彩与标签）
+  // 单书详情页高亮过滤
   const filteredAnnotations = currentAnnotations.filter(a => {
     if (selectedColor && a.colorKey !== selectedColor) return false;
     if (selectedTag && !(a.tags || []).includes(selectedTag)) return false;
     return true;
   });
+
+  // 首页书架过滤计算
+  const matchingAnnotationsForBookshelf = allAnnotations.filter(a => {
+    if (selectedColor && a.colorKey !== selectedColor) return false;
+    if (selectedTag && !(a.tags || []).includes(selectedTag)) return false;
+    return true;
+  });
+
+  const matchingAssetIds = new Set(matchingAnnotationsForBookshelf.map(a => a.assetId));
+
+  const filteredBookshelfBooks = (selectedColor || selectedTag)
+    ? books.filter(b => matchingAssetIds.has(b.assetId))
+    : books;
+
+  const filteredCountMap: Record<string, number> = {};
+  if (selectedColor || selectedTag) {
+    for (const a of matchingAnnotationsForBookshelf) {
+      filteredCountMap[a.assetId] = (filteredCountMap[a.assetId] || 0) + 1;
+    }
+  }
 
   const exportingBook = exportBookAssetId
     ? books.find(b => b.assetId === exportBookAssetId) || selectedBook
@@ -246,13 +287,27 @@ export default function App() {
         onSelectTab={tab => {
           setCurrentTab(tab);
           setSelectedBook(null);
+          if (tab === 'books') {
+            setSelectedColor(null);
+            setSelectedTag(null);
+          }
         }}
         colorSemantics={colorSemantics}
         selectedColor={selectedColor}
-        onSelectColor={setSelectedColor}
+        onSelectColor={color => {
+          setSelectedColor(color);
+          if (currentTab !== 'books') {
+            setCurrentTab('books');
+          }
+        }}
         tags={tags}
         selectedTag={selectedTag}
-        onSelectTag={setSelectedTag}
+        onSelectTag={tag => {
+          setSelectedTag(tag);
+          if (currentTab !== 'books') {
+            setCurrentTab('books');
+          }
+        }}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
         onSelectCustomDir={async () => {
@@ -347,7 +402,25 @@ export default function App() {
             onRequestContext={handleRequestContext}
           />
         ) : (
-          <BookshelfView books={books} onSelectBook={handleSelectBook} />
+          <BookshelfView
+            books={filteredBookshelfBooks}
+            onSelectBook={handleSelectBook}
+            selectedColor={selectedColor}
+            selectedTag={selectedTag}
+            colorSemantics={colorSemantics}
+            matchingAnnotations={matchingAnnotationsForBookshelf}
+            filteredCountMap={filteredCountMap}
+            onClearFilter={() => {
+              setSelectedColor(null);
+              setSelectedTag(null);
+            }}
+            onToggleStar={handleToggleStar}
+            onUpdateCustomNote={handleUpdateCustomNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
+            onRequestContext={handleRequestContext}
+          />
         )}
       </main>
 

@@ -61,7 +61,7 @@ export type ReviewStats = DailyReviewStats;
 export interface BookEchoAPI {
   // 书架与高亮读取
   getBooks: () => Promise<BookItem[]>;
-  getBookAnnotations: (assetId: string) => Promise<AnnotationItem[]>;
+  getBookAnnotations: (assetId?: string) => Promise<AnnotationItem[]>;
   searchAnnotations: (keyword: string) => Promise<AnnotationItem[]>;
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) => Promise<HighlightContextResult>;
 

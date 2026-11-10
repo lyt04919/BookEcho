@@ -51,14 +51,16 @@ function registerIpcHandlers() {
     });
   });
 
-  ipcMain.handle('annotations:getByBook', async (_, assetId: string) => {
+  ipcMain.handle('annotations:getByBook', async (_, assetId?: string) => {
     const rawList = syncer.extractAnnotations(assetId);
     const books = syncer.extractBooks();
-    const book = books.find(b => b.assetId === assetId);
+    const bookMap = new Map(books.map(b => [b.assetId, b]));
+    const targetBook = assetId ? bookMap.get(assetId) : null;
 
     const result: AnnotationItem[] = rawList.map(item => {
       const meta = vault.getAnnotationMeta(item.uuid);
       const tags = vault.getTagsForAnnotation(item.uuid);
+      const book = targetBook || bookMap.get(item.assetId);
 
       // 若未解析过章节，尝试通过 EPUB 解析
       let chapterTitle = meta?.resolvedChapter || item.chapterTitle;
@@ -73,6 +75,8 @@ function registerIpcHandlers() {
 
       return {
         ...item,
+        bookTitle: book?.title || '未知书籍',
+        author: book?.author || null,
         chapterTitle,
         sortIndex,
         customNote: meta?.customNote || '',
@@ -82,7 +86,12 @@ function registerIpcHandlers() {
         lastReviewedAtMs: meta?.lastReviewedAtMs || null,
         tags
       };
-    }).sort((a, b) => a.sortIndex - b.sortIndex || a.creationDateMs - b.creationDateMs);
+    }).sort((a, b) => {
+      if (assetId) {
+        return a.sortIndex - b.sortIndex || a.creationDateMs - b.creationDateMs;
+      }
+      return (b.creationDateMs || 0) - (a.creationDateMs || 0);
+    });
 
     return result;
   });
