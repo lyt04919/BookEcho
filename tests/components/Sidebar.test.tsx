@@ -176,6 +176,6 @@ describe('App Integration with Sidebar', () => {
     const html = renderToStaticMarkup(<App />);
     expect(html).toContain('BookEcho');
     expect(html).toContain('全部书架');
-    expect(html).toContain('BookEcho 书架视图');
+    expect(html).toContain('我的书库');
   });
 });

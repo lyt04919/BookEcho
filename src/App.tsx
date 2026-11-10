@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { ColorSemanticConfig, HighlightColor } from '../electron/types/ipc';
+import { BookshelfView } from './components/BookshelfView';
+import { BookItem, ColorSemanticConfig, HighlightColor } from '../electron/types/ipc';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'yellow', label: '核心论点', hexColor: '#F5A623' },
@@ -18,6 +19,8 @@ export default function App() {
   const [tags, setTags] = useState<string[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [books, setBooks] = useState<BookItem[]>([]);
+  const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -32,6 +35,12 @@ export default function App() {
       }).catch(err => {
         console.warn('Failed to fetch tags', err);
       });
+
+      window.bookEchoAPI.getBooks().then(res => {
+        if (res) setBooks(res);
+      }).catch(err => {
+        console.warn('Failed to fetch books', err);
+      });
     }
   }, []);
 
@@ -40,6 +49,7 @@ export default function App() {
     if (tab === 'books') {
       setSelectedColor(null);
       setSelectedTag(null);
+      setSelectedBook(null);
     }
   };
 
@@ -82,16 +92,44 @@ export default function App() {
         onToggleDarkMode={handleToggleDarkMode}
         onSelectCustomDir={handleSelectCustomDir}
       />
-      <main className="flex-1 flex flex-col items-center justify-center p-8 select-none">
-        <div className="max-w-md text-center space-y-3">
-          <h1 className="text-2xl font-serif font-semibold text-paper-text dark:text-night-text">BookEcho 书架视图</h1>
-          <p className="text-sm text-paper-muted dark:text-night-muted">
-            当前视图: <span className="font-medium text-paper-terracotta dark:text-night-terracotta">{currentTab}</span>
-            {selectedColor && <> | 颜色过滤: <span className="font-medium">{selectedColor}</span></>}
-            {selectedTag && <> | 标签: <span className="font-medium">#{selectedTag}</span></>}
-          </p>
-        </div>
-      </main>
+      {currentTab === 'books' && (
+        selectedBook ? (
+          <main className="flex-1 flex flex-col p-8 overflow-y-auto select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
+            <button
+              onClick={() => setSelectedBook(null)}
+              className="self-start text-sm text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta mb-4 transition-colors"
+            >
+              &larr; 返回书架
+            </button>
+            <h2 className="text-2xl font-serif font-bold text-paper-text dark:text-night-text">{selectedBook.title}</h2>
+          </main>
+        ) : (
+          <BookshelfView
+            books={books}
+            onSelectBook={setSelectedBook}
+          />
+        )
+      )}
+      {currentTab === 'review' && (
+        <main className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
+          <div className="max-w-md text-center space-y-3">
+            <h1 className="text-2xl font-serif font-semibold text-paper-text dark:text-night-text">每日回顾</h1>
+            <p className="text-sm text-paper-muted dark:text-night-muted">
+              回顾卡片即将就绪
+            </p>
+          </div>
+        </main>
+      )}
+      {currentTab === 'search' && (
+        <main className="flex-1 flex flex-col items-center justify-center p-8 select-none bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
+          <div className="max-w-md text-center space-y-3">
+            <h1 className="text-2xl font-serif font-semibold text-paper-text dark:text-night-text">全局搜索</h1>
+            <p className="text-sm text-paper-muted dark:text-night-muted">
+              搜索高亮与笔记
+            </p>
+          </div>
+        </main>
+      )}
     </div>
   );
 }
