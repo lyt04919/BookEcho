@@ -96,7 +96,9 @@ describe('KnowledgeGraphView Component', () => {
     expect(html).toContain('仅看连接');
     expect(html).toContain('标签枢纽');
     expect(html).toContain('读书高亮节点');
-    expect(html).toContain('<canvas');
+    expect(html).toContain('主题成簇');
+    expect(html).toContain('共鸣瀑布流');
+    expect(html).toContain('追求财富，而不是追求金钱或地位。');
   });
 
   it('should render the connected node drawer when initialFocusedNodeId is provided', () => {
