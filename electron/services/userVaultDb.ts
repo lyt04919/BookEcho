@@ -187,7 +187,7 @@ export class UserVaultDb {
 
   public getTagsForAnnotation(uuid: string): string[] {
     const rows = this.db.prepare(`
-      SELECT tag_name as tag FROM annotation_tags WHERE annotation_uuid = ? ORDER BY created_at ASC
+      SELECT tag_name as tag FROM annotation_tags WHERE annotation_uuid = ? ORDER BY created_at ASC, rowid ASC
     `).all(uuid) as { tag: string }[];
     return rows.map(r => r.tag);
   }

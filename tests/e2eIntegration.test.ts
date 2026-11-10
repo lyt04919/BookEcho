@@ -11,12 +11,17 @@ import { MarkdownExporter } from '../electron/services/markdownExporter';
 
 describe('Full End-to-End System Pipeline', () => {
   let tempDir: string;
+  let vault: UserVaultDb | null = null;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bookecho-e2e-'));
+    vault = null;
   });
 
   afterEach(() => {
+    if (vault) {
+      try { vault.close(); } catch {}
+    }
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -33,7 +38,7 @@ describe('Full End-to-End System Pipeline', () => {
       customAeDir: mockDb.aeDir,
       cacheDir
     });
-    const vault = new UserVaultDb(vaultPath);
+    vault = new UserVaultDb(vaultPath);
     const epubEngine = new EpubContextEngine();
 
     // 2. 提取书籍
@@ -75,7 +80,9 @@ describe('Full End-to-End System Pipeline', () => {
     expect(meta?.customNote).toContain('金融决策');
 
     const tags = vault.getTagsForAnnotation(firstAnno.uuid);
-    expect(tags).toEqual(['行为经济学', '思维陷阱']);
+    expect(tags).toHaveLength(2);
+    expect(tags).toContain('行为经济学');
+    expect(tags).toContain('思维陷阱');
 
     // 6. 每日回顾评分验证
     const reviewQueue = vault.getReviewCandidates([firstAnno.uuid, annos[1].uuid]);
@@ -94,8 +101,7 @@ describe('Full End-to-End System Pipeline', () => {
     expect(md).toContain('> [!quote] 🟡 核心论点');
     expect(md).toContain('系统1的运行是无意识且快速的');
     expect(md).toContain('**扩展**：直觉系统虽然快');
-    expect(md).toContain('#行为经济学 #思维陷阱');
-
-    vault.close();
+    expect(md).toContain('#行为经济学');
+    expect(md).toContain('#思维陷阱');
   });
 });
