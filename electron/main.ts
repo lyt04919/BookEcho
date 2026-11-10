@@ -13,6 +13,14 @@ let vault: UserVaultDb;
 let epubEngine: EpubContextEngine;
 
 function initializeServices() {
+  if (vault) {
+    try {
+      vault.close();
+    } catch {
+      // ignore close errors during re-initialization
+    }
+  }
+
   const userDataPath = app.getPath('userData');
   const cacheDir = path.join(userDataPath, 'snapshots');
   const vaultDbPath = path.join(userDataPath, 'user_vault.sqlite');
@@ -74,19 +82,27 @@ function registerIpcHandlers() {
     const lower = keyword.toLowerCase().trim();
     if (!lower) return [];
 
-    const result: AnnotationItem[] = all.filter(a =>
-      a.selectedText.toLowerCase().includes(lower) ||
-      (a.note && a.note.toLowerCase().includes(lower))
-    ).map(item => {
+    const result: AnnotationItem[] = [];
+    for (const item of all) {
       const meta = vault.getAnnotationMeta(item.uuid);
       const tags = vault.getTagsForAnnotation(item.uuid);
-      return {
-        ...item,
-        customNote: meta?.customNote || '',
-        isStarred: meta?.isStarred || false,
-        tags
-      };
-    });
+      const customNote = meta?.customNote || '';
+      const isStarred = meta?.isStarred || false;
+
+      const matchesSelected = item.selectedText.toLowerCase().includes(lower);
+      const matchesNote = Boolean(item.note && item.note.toLowerCase().includes(lower));
+      const matchesCustomNote = customNote.toLowerCase().includes(lower);
+      const matchesTags = tags.some(t => t.toLowerCase().includes(lower));
+
+      if (matchesSelected || matchesNote || matchesCustomNote || matchesTags) {
+        result.push({
+          ...item,
+          customNote,
+          isStarred,
+          tags
+        });
+      }
+    }
 
     return result;
   });
@@ -131,19 +147,23 @@ function registerIpcHandlers() {
 
     const books = syncer.extractBooks();
     const bookMap = new Map(books.map(b => [b.assetId, b]));
+    const allMap = new Map(all.map(a => [a.uuid, a]));
 
-    const result: (AnnotationItem & { bookTitle?: string })[] = all.filter(a => topUuids.includes(a.uuid)).map(item => {
-      const meta = vault.getAnnotationMeta(item.uuid);
-      const tags = vault.getTagsForAnnotation(item.uuid);
-      const book = bookMap.get(item.assetId);
-      return {
-        ...item,
-        customNote: meta?.customNote || '',
-        isStarred: meta?.isStarred || false,
-        tags,
-        bookTitle: book?.title || '未知书籍'
-      };
-    });
+    const result: (AnnotationItem & { bookTitle?: string })[] = topUuids
+      .map(uuid => allMap.get(uuid))
+      .filter((item): item is AnnotationItem => Boolean(item))
+      .map(item => {
+        const meta = vault.getAnnotationMeta(item.uuid);
+        const tags = vault.getTagsForAnnotation(item.uuid);
+        const book = bookMap.get(item.assetId);
+        return {
+          ...item,
+          customNote: meta?.customNote || '',
+          isStarred: meta?.isStarred || false,
+          tags,
+          bookTitle: book?.title || '未知书籍'
+        };
+      });
 
     return result;
   });
@@ -193,21 +213,26 @@ function registerIpcHandlers() {
     const annotations: AnnotationItem[] = syncer.extractAnnotations(assetId).map(item => {
       const meta = vault.getAnnotationMeta(item.uuid);
       const tags = vault.getTagsForAnnotation(item.uuid);
+      const chapterTitle = meta?.resolvedChapter || item.chapterTitle;
+      const sortIndex = meta?.sortIndex ?? item.sortIndex;
       return {
         ...item,
+        chapterTitle,
+        sortIndex,
         customNote: meta?.customNote || '',
         isStarred: meta?.isStarred || false,
         tags
       };
-    });
+    }).sort((a, b) => a.sortIndex - b.sortIndex || a.creationDateMs - b.creationDateMs);
 
     const content = format === 'obsidian'
       ? MarkdownExporter.formatObsidianMarkdown(book, annotations)
       : MarkdownExporter.formatStandardMarkdown(book, annotations);
 
+    const safeTitle = book.title.replace(/[/\\?%*:|"<>]/g, '_');
     const result = await dialog.showSaveDialog(mainWindow, {
       title: '导出读书笔记 Markdown',
-      defaultPath: `${book.title}_笔记.md`,
+      defaultPath: `${safeTitle}_笔记.md`,
       filters: [{ name: 'Markdown', extensions: ['md'] }]
     });
 
