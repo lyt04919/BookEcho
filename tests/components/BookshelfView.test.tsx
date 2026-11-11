@@ -228,6 +228,33 @@ describe('BookshelfView Component', () => {
     expect(html).toContain('从重点书单移出 B - 思考快与慢');
     expect(html).toContain('将 A - 原则 加入重点书单');
   });
+
+  it('should filter out hidden books and render manage bookshelf trigger', () => {
+    const html = renderToStaticMarkup(
+      <BookshelfView
+        {...defaultProps}
+        hiddenBookIds={['asset-book-c']}
+        onUpdateHiddenBooks={vi.fn()}
+      />
+    );
+    expect(html).toContain('data-testid="manage-bookshelf-btn"');
+    expect(html).toContain('管理书架 (已隐藏 1 本)');
+    expect(html).toContain('共展示 2 本书（已隐藏 1 本）');
+    expect(html).not.toContain('C - 暗时间');
+    expect(html).toContain('从书架隐藏 B - 思考快与慢');
+  });
+
+  it('should render empty state recovery button when all books are hidden', () => {
+    const html = renderToStaticMarkup(
+      <BookshelfView
+        {...defaultProps}
+        hiddenBookIds={mockBooks.map(b => b.assetId)}
+        onUpdateHiddenBooks={vi.fn()}
+      />
+    );
+    expect(html).toContain('当前已隐藏全部藏书');
+    expect(html).toContain('选择要展示的书籍');
+  });
 });
 
 describe('App Integration with BookshelfView', () => {

@@ -12,8 +12,11 @@ import {
   Clock,
   ArrowUpDown,
   Bookmark,
-  Library
+  Library,
+  EyeOff,
+  SlidersHorizontal
 } from 'lucide-react';
+import { BookshelfVisibilityModal } from './BookshelfVisibilityModal';
 
 export interface BookshelfViewProps {
   books: BookItem[];
@@ -21,6 +24,8 @@ export interface BookshelfViewProps {
   defaultSortBy?: 'recent' | 'highlights' | 'title';
   pinnedBookIds?: string[];
   onTogglePinBook?: (assetId: string) => void;
+  hiddenBookIds?: string[];
+  onUpdateHiddenBooks?: (nextHiddenIds: string[]) => void;
   selectedColor?: HighlightColor | null;
   selectedTag?: string | null;
   colorSemantics?: ColorSemanticConfig[];
@@ -40,16 +45,23 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
   onSelectBook,
   defaultSortBy = 'recent',
   pinnedBookIds = [],
-  onTogglePinBook
+  onTogglePinBook,
+  hiddenBookIds = [],
+  onUpdateHiddenBooks
 }) => {
   const [sortBy, setSortBy] = useState<'recent' | 'highlights' | 'title'>(defaultSortBy);
   const [filterMode, setFilterMode] = useState<'all' | 'has_notes' | 'pinned'>('all');
+  const [isVisibilityModalOpen, setIsVisibilityModalOpen] = useState(false);
 
-  // 计算有笔记的书籍、重点书单与总高亮数
+  // 计算书架可见书籍、隐藏数、重点书单与总高亮数
+  const hiddenSet = new Set(hiddenBookIds);
+  const visibleShelfBooks = books.filter(b => !hiddenSet.has(b.assetId));
+  const hiddenCount = books.length - visibleShelfBooks.length;
+
   const pinnedSet = new Set(pinnedBookIds);
-  const pinnedBooks = books.filter(b => pinnedSet.has(b.assetId));
-  const booksWithNotes = books.filter(b => (b.highlightsCount || 0) > 0);
-  const totalHighlights = books.reduce((acc, b) => acc + (b.highlightsCount || 0), 0);
+  const pinnedBooks = visibleShelfBooks.filter(b => pinnedSet.has(b.assetId));
+  const booksWithNotes = visibleShelfBooks.filter(b => (b.highlightsCount || 0) > 0);
+  const totalHighlights = visibleShelfBooks.reduce((acc, b) => acc + (b.highlightsCount || 0), 0);
 
   // 根据当前过滤器获取目标书籍
   const displayBooks =
@@ -57,7 +69,14 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
       ? booksWithNotes
       : filterMode === 'pinned'
       ? pinnedBooks
-      : books;
+      : visibleShelfBooks;
+
+  const handleHideSingleBook = (assetId: string) => {
+    if (!onUpdateHiddenBooks) return;
+    if (!hiddenSet.has(assetId)) {
+      onUpdateHiddenBooks([...hiddenBookIds, assetId]);
+    }
+  };
 
   // 排序
   const sortedBooks = [...displayBooks].sort((a, b) => {
@@ -93,6 +112,22 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
                 {book.title}
               </span>
             </div>
+          )}
+
+          {/* 左上角：从书架隐藏书籍快捷按钮 */}
+          {onUpdateHiddenBooks && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                handleHideSingleBook(book.assetId);
+              }}
+              className="absolute top-2 left-2 p-1.5 rounded-full bg-black/45 text-white/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-black/75 hover:text-white transition-all"
+              title="从书架中隐藏（可在“管理书架”随时找回）"
+              aria-label={`从书架隐藏 ${book.title}`}
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
           )}
 
           {/* 右上角：加入/移出重点书单书签按钮 */}
@@ -166,7 +201,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
       {/* 顶部统计横幅 */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text">我的书库</h2>
             {/* 书架范围快捷筛选胶囊 */}
             <div className="flex items-center bg-paper-drawer dark:bg-night-drawer p-0.5 rounded-lg border border-paper-border/60 dark:border-night-border text-xs">
@@ -180,7 +215,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
                 }`}
               >
                 <Library className="w-3.5 h-3.5" />
-                <span>全部藏书 ({books.length})</span>
+                <span>全部藏书 ({visibleShelfBooks.length})</span>
               </button>
               <button
                 data-testid="filter-notes-books"
@@ -209,9 +244,28 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
                 </button>
               )}
             </div>
+
+            {onUpdateHiddenBooks && books.length > 0 && (
+              <button
+                type="button"
+                data-testid="manage-bookshelf-btn"
+                onClick={() => setIsVisibilityModalOpen(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors ${
+                  hiddenCount > 0
+                    ? 'border-paper-terracotta/50 bg-paper-terracotta/10 text-paper-terracotta dark:text-night-terracotta font-medium'
+                    : 'border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+                }`}
+                title="自由选择哪些书籍展示在当前书架"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>{hiddenCount > 0 ? `管理书架 (已隐藏 ${hiddenCount} 本)` : '管理书架'}</span>
+              </button>
+            )}
           </div>
           <p className="text-sm text-paper-muted dark:text-night-muted mt-1.5">
-            共收录 {books.length} 本书 · 累计 {totalHighlights} 条高亮与思考
+            {hiddenCount > 0
+              ? `共展示 ${visibleShelfBooks.length} 本书（已隐藏 ${hiddenCount} 本）· 累计 ${totalHighlights} 条高亮与思考`
+              : `共收录 ${books.length} 本书 · 累计 ${totalHighlights} 条高亮与思考`}
           </p>
         </div>
 
@@ -257,26 +311,53 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Book className="w-12 h-12 text-paper-muted/40 dark:text-night-muted/40 mb-3" />
           <p className="text-base font-serif font-medium text-paper-text dark:text-night-text">
-            {filterMode === 'has_notes' ? '暂无包含笔记的书籍' : '暂无书籍'}
+            {filterMode === 'has_notes'
+              ? '暂无包含笔记的书籍'
+              : filterMode === 'pinned'
+              ? '重点书单暂无书籍'
+              : books.length > 0 && visibleShelfBooks.length === 0
+              ? '当前已隐藏全部藏书'
+              : '暂无书籍'}
           </p>
           <p className="text-xs text-paper-muted dark:text-night-muted mt-1">
             {filterMode === 'has_notes'
               ? '可切换回“全部藏书”查看所有书籍'
+              : filterMode === 'pinned'
+              ? '可点击书籍封面右上角书签加入重点书单'
+              : books.length > 0 && visibleShelfBooks.length === 0
+              ? '点击下方按钮重新挑选需要在书架中展示的书籍'
               : '请在 Apple Books 中阅读并添加高亮，或检查数据源目录'}
           </p>
-          {filterMode === 'has_notes' && (
+          {filterMode === 'has_notes' || filterMode === 'pinned' ? (
             <button
               onClick={() => setFilterMode('all')}
               className="mt-4 px-3.5 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm"
             >
-              查看全部藏书 ({books.length})
+              查看全部藏书 ({visibleShelfBooks.length})
             </button>
-          )}
+          ) : books.length > 0 && visibleShelfBooks.length === 0 && onUpdateHiddenBooks ? (
+            <button
+              onClick={() => setIsVisibilityModalOpen(true)}
+              className="mt-4 px-3.5 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm"
+            >
+              选择要展示的书籍
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {sortedBooks.map(renderBookCard)}
         </div>
+      )}
+
+      {/* 书架展示管理弹窗 */}
+      {isVisibilityModalOpen && onUpdateHiddenBooks && (
+        <BookshelfVisibilityModal
+          books={books}
+          hiddenBookIds={hiddenBookIds}
+          onSave={onUpdateHiddenBooks}
+          onClose={() => setIsVisibilityModalOpen(false)}
+        />
       )}
     </div>
   );

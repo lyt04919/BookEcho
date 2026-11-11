@@ -64,6 +64,7 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
   onRemoveTag,
   onOpenQuoteModal,
   onRequestContext,
+  activeChapter = null,
   onActiveChapterChange,
   readingChapterContent = null,
   isLoadingChapterContent = false,
@@ -395,6 +396,41 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
               未能在本地 EPUB 文件中提取到该章节的正文内容（可能书籍尚未下载到本地或受 DRM 保护）。
             </p>
           )}
+        </div>
+      )}
+
+      {/* 选中的无高光章节优雅空状态（方案 A：无高光章节不强行用全文取而代之） */}
+      {activeChapter && !chapterGroups[activeChapter] && annotations.length > 0 && (
+        <div
+          data-testid="empty-chapter-state"
+          className="mb-8 p-6 rounded-2xl bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border shadow-xs flex flex-col items-center justify-center text-center py-8 max-w-4xl"
+        >
+          <div className="w-12 h-12 rounded-full bg-paper-drawer dark:bg-night-drawer flex items-center justify-center text-paper-terracotta dark:text-night-terracotta mb-3">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <h3 className="font-serif text-base font-bold text-paper-text dark:text-night-text mb-1">
+            《{activeChapter}》暂无划线笔记
+          </h3>
+          <p className="text-xs text-paper-muted dark:text-night-muted mb-4 max-w-md leading-relaxed">
+            你在此章节中尚未留下划线或批注。可直接前往 Apple Books 继续阅读并勾画重点。
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onOpenInAppleBooks(book.assetId, book.epubPath)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>在 Apple Books 中阅读本章</span>
+            </button>
+            {onActiveChapterChange && (
+              <button
+                onClick={() => onActiveChapterChange('')}
+                className="px-3 py-1.5 rounded-lg bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text text-xs transition-colors"
+              >
+                查看全部章节笔记
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -31,6 +31,19 @@ const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
   { colorKey: 'underline', label: '重点下划线', hexColor: '#D9534F' }
 ];
 
+const parseStringArraySetting = (raw: string | null): string[] | null => {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((id): id is string => typeof id === 'string');
+    }
+  } catch {
+    // 忽略格式异常配置
+  }
+  return null;
+};
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('books');
   const [books, setBooks] = useState<BookItem[]>([]);
@@ -63,12 +76,15 @@ export default function App() {
     'demo-book-naval',
     'demo-book-munger'
   ]);
+  const [hiddenBookIds, setHiddenBookIds] = useState<string[]>([]);
+  const [demoHiddenBookIds, setDemoHiddenBookIds] = useState<string[]>([]);
 
   // 活跃数据（支持在真实库与示例测试数据间平滑切换）
   const activeBooks = isDemoMode ? DEMO_BOOKS : books;
   const activeTags = isDemoMode ? demoTags : tags;
   const activeAnnotations = isDemoMode ? demoAnnotations : allAnnotations;
   const activePinnedBookIds = isDemoMode ? demoPinnedBookIds : pinnedBookIds;
+  const activeHiddenBookIds = isDemoMode ? demoHiddenBookIds : hiddenBookIds;
 
   // 跳转到知识网络图谱并聚焦指定高亮节点
   const handleOpenInGraph = (annotation: AnnotationItem) => {
@@ -82,27 +98,22 @@ export default function App() {
   const loadInitialData = async () => {
     try {
       if (typeof window !== 'undefined' && window.bookEchoAPI) {
-        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw] = await Promise.all([
+        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw] = await Promise.all([
           window.bookEchoAPI.getBooks(),
           window.bookEchoAPI.getColorSemantics(),
           window.bookEchoAPI.getAllTags(),
           window.bookEchoAPI.getBookAnnotations(),
-          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('pinned_book_ids') : Promise.resolve(null)
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('pinned_book_ids') : Promise.resolve(null),
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('hidden_book_ids') : Promise.resolve(null)
         ]);
         setBooks(fetchedBooks || []);
         if (semantics && semantics.length > 0) {
           setColorSemantics(semantics);
         }
-        if (pinnedRaw) {
-          try {
-            const parsed = JSON.parse(pinnedRaw);
-            if (Array.isArray(parsed)) {
-              setPinnedBookIds(parsed.filter((id): id is string => typeof id === 'string'));
-            }
-          } catch {
-            // 忽略异常设置
-          }
-        }
+        const parsedPinned = parseStringArraySetting(pinnedRaw);
+        if (parsedPinned) setPinnedBookIds(parsedPinned);
+        const parsedHidden = parseStringArraySetting(hiddenRaw);
+        if (parsedHidden) setHiddenBookIds(parsedHidden);
         setTags(fetchedTags || []);
         setAllAnnotations(allAnnos || []);
         setHasPermissionError(false);
@@ -357,18 +368,23 @@ export default function App() {
     }
   };
 
-  // 保存并切换用户手动勾选的重点书单
-  const savePinnedBooks = async (nextIds: string[]) => {
+  // 通用书籍清单配置持久化辅助方法
+  const persistBookListSetting = async (
+    settingKey: 'pinned_book_ids' | 'hidden_book_ids',
+    nextIds: string[],
+    setDemoState: (ids: string[]) => void,
+    setRealState: (ids: string[]) => void
+  ) => {
     if (isDemoMode) {
-      setDemoPinnedBookIds(nextIds);
+      setDemoState(nextIds);
       return;
     }
-    setPinnedBookIds(nextIds);
+    setRealState(nextIds);
     if (typeof window !== 'undefined' && window.bookEchoAPI?.setSetting) {
       try {
-        await window.bookEchoAPI.setSetting('pinned_book_ids', JSON.stringify(nextIds));
+        await window.bookEchoAPI.setSetting(settingKey, JSON.stringify(nextIds));
       } catch (err) {
-        console.error('Failed to persist pinned books', err);
+        console.error(`Failed to persist ${settingKey}`, err);
       }
     }
   };
@@ -377,13 +393,17 @@ export default function App() {
     const nextIds = activePinnedBookIds.includes(assetId)
       ? activePinnedBookIds.filter(id => id !== assetId)
       : [...activePinnedBookIds, assetId];
-    void savePinnedBooks(nextIds);
+    void persistBookListSetting('pinned_book_ids', nextIds, setDemoPinnedBookIds, setPinnedBookIds);
   };
 
   const handleBatchPinBooks = (assetIds: string[]) => {
     if (assetIds.length === 0) return;
     const nextIds = Array.from(new Set([...activePinnedBookIds, ...assetIds]));
-    void savePinnedBooks(nextIds);
+    void persistBookListSetting('pinned_book_ids', nextIds, setDemoPinnedBookIds, setPinnedBookIds);
+  };
+
+  const handleUpdateHiddenBooks = (nextHiddenIds: string[]) => {
+    void persistBookListSetting('hidden_book_ids', nextHiddenIds, setDemoHiddenBookIds, setHiddenBookIds);
   };
 
   // 标签增删
@@ -593,6 +613,7 @@ export default function App() {
 
   const handleSelectChapter = (chapter: string) => {
     setActiveChapter(chapter);
+    setReadingChapterContent(null);
     if (typeof document !== 'undefined') {
       const el = document.getElementById(`chapter-${encodeURIComponent(chapter)}`);
       if (el) {
@@ -600,8 +621,7 @@ export default function App() {
         return;
       }
     }
-    // 若该章节暂无高亮卡片，直接展开阅读该章节 EPUB 原文
-    handleReadChapter(chapter);
+    // 方案 A：若该章节暂无划线，不再自动加载整章 EPUB 纯文本取而代之，交由 BookDetailView 展示优雅空状态与唤起 Apple Books 引导
   };
 
   // 全书库中的批注与星标精华
@@ -902,6 +922,8 @@ export default function App() {
             onSelectBook={handleSelectBook}
             pinnedBookIds={activePinnedBookIds}
             onTogglePinBook={handleTogglePinBook}
+            hiddenBookIds={activeHiddenBookIds}
+            onUpdateHiddenBooks={handleUpdateHiddenBooks}
           />
         )}
       </main>

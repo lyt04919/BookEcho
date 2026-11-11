@@ -301,5 +301,20 @@ describe('BookDetailView Component', () => {
     );
     expect(pinnedHtml).toContain('已在重点书单');
   });
+
+  it('should render elegant empty chapter state when activeChapter has no notes (方案 A)', () => {
+    const onOpenInAppleBooks = vi.fn();
+    const onActiveChapterChange = vi.fn();
+    const props = createDefaultProps({
+      activeChapter: '第四章 未划线的章节',
+      onOpenInAppleBooks,
+      onActiveChapterChange
+    });
+    const html = renderToStaticMarkup(<BookDetailView {...props} />);
+    expect(html).toContain('data-testid="empty-chapter-state"');
+    expect(html).toContain('《第四章 未划线的章节》暂无划线笔记');
+    expect(html).toContain('在 Apple Books 中阅读本章');
+    expect(html).toContain('查看全部章节笔记');
+  });
 });
 

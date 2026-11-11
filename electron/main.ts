@@ -273,7 +273,7 @@ function registerIpcHandlers() {
     vault.updateColorSemantic(colorKey, label, hexColor);
   });
 
-  const ALLOWED_UI_SETTINGS = new Set(['pinned_book_ids']);
+  const ALLOWED_UI_SETTINGS = new Set(['pinned_book_ids', 'hidden_book_ids']);
 
   ipcMain.handle('settings:get', async (_, key: string) => {
     if (!ALLOWED_UI_SETTINGS.has(key)) return null;
