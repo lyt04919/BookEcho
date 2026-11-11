@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { HighlightCard, HighlightCardProps } from '../../src/components/HighlightCard';
+import { HighlightCard, HighlightCardProps, findHighlightMatchRange } from '../../src/components/HighlightCard';
 import { AnnotationItem, ColorSemanticConfig } from '../../electron/types/ipc';
 
 const mockColorSemantics: ColorSemanticConfig[] = [
@@ -161,11 +161,27 @@ describe('HighlightCard Component', () => {
     expect(html).toContain('flex flex-col justify-between');
   });
 
-  it('should render collapsible context trigger button and context modal trigger', () => {
+  it('should render view context modal trigger button with accurate label', () => {
     const props = createDefaultProps();
     const html = renderToStaticMarkup(<HighlightCard {...props} />);
-    expect(html).toContain('展开原文语境');
-    expect(html).toContain('居中窗口查看前后原文语境');
+    expect(html).toContain('查看原文语境');
+    expect(html).toContain('打开居中窗口查看原文语境');
+    expect(html).not.toContain('展开原文语境');
+  });
+
+  it('should locate exact and whitespace-tolerant substring ranges for secondary paragraph highlight', () => {
+    const para = '前缀内容。知行合一，\n致良知。此心光明，亦复何言。';
+    const exactRange = findHighlightMatchRange(para, '此心光明');
+    expect(exactRange).not.toBeNull();
+    expect(para.slice(exactRange!.start, exactRange!.end)).toBe('此心光明');
+
+    // Cross-whitespace tolerance (e.g. newline inside paragraph)
+    const fuzzyRange = findHighlightMatchRange(para, '知行合一， 致良知。');
+    expect(fuzzyRange).not.toBeNull();
+    expect(para.slice(fuzzyRange!.start, fuzzyRange!.end)).toBe('知行合一，\n致良知。');
+
+    // Non-matching fallback
+    expect(findHighlightMatchRange(para, '完全不存在的段落片段')).toBeNull();
   });
 
   it('should support dark mode tokens for night mode styling', () => {

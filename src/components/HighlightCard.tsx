@@ -1,7 +1,93 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnnotationItem, ColorSemanticConfig, HighlightContextResult } from '../../electron/types/ipc';
-import { Star, MessageSquare, ChevronDown, Image, Tag, Plus, Check, Copy, Waypoints, ArrowUpRight, X, BookOpen, Quote } from 'lucide-react';
+import { Star, MessageSquare, Image, Tag, Plus, Check, Copy, Waypoints, ArrowUpRight, X, BookOpen, Quote } from 'lucide-react';
+
+/**
+ * 在核心段落文本中定位高亮选区范围，用于二次强调渲染
+ */
+export function findHighlightMatchRange(
+  paragraph: string,
+  selectedText: string
+): { start: number; end: number } | null {
+  if (!paragraph || !selectedText) return null;
+  const trimmed = selectedText.trim();
+  if (!trimmed) return null;
+
+  // 1. 优先尝试完全精确匹配
+  const exactIndex = paragraph.indexOf(trimmed);
+  if (exactIndex !== -1) {
+    return { start: exactIndex, end: exactIndex + trimmed.length };
+  }
+
+  // 2. 尝试容忍空白符/换行差异的匹配（按空白分词，允许词间出现任意 \s*）
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  if (tokens.length > 0 && tokens.length <= 150) {
+    const escapedTokens = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    try {
+      const regex = new RegExp(escapedTokens.join('\\s*'));
+      const match = regex.exec(paragraph);
+      if (match && match.index !== undefined) {
+        return { start: match.index, end: match.index + match[0].length };
+      }
+    } catch {
+      // 忽略异常回退
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 在自然段内渲染二次高光文本节点
+ */
+function renderParagraphWithHighlight(
+  paragraph: string,
+  selectedText: string,
+  colorHex: string
+): React.ReactNode {
+  const target = paragraph || selectedText;
+  const range = findHighlightMatchRange(target, selectedText);
+
+  if (!range) {
+    // 如果段落本身就是整句未匹配到子串，仍然高亮展示全文或保持段落展示
+    if (!paragraph && selectedText) {
+      return (
+        <mark
+          className="px-1 py-0.5 rounded-sm font-semibold text-paper-text dark:text-night-text"
+          style={{
+            backgroundColor: `${colorHex}45`,
+            boxShadow: `inset 0 -2px 0 ${colorHex}`
+          }}
+        >
+          {selectedText}
+        </mark>
+      );
+    }
+    return target;
+  }
+
+  const before = target.slice(0, range.start);
+  const matched = target.slice(range.start, range.end);
+  const after = target.slice(range.end);
+
+  return (
+    <>
+      {before && <span>{before}</span>}
+      <mark
+        className="px-1 py-0.5 rounded-sm font-semibold text-paper-text dark:text-night-text"
+        style={{
+          backgroundColor: `${colorHex}45`,
+          boxShadow: `inset 0 -2px 0 ${colorHex}`
+        }}
+        data-testid="modal-secondary-highlight"
+      >
+        {matched}
+      </mark>
+      {after && <span>{after}</span>}
+    </>
+  );
+}
 
 export interface HighlightCardProps {
   annotation: AnnotationItem;
@@ -229,11 +315,11 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
                 </div>
               )}
 
-              {/* 当前划线所在自然段（高亮突出显示） */}
+              {/* 当前划线所在自然段（段落柔和聚焦 + 划线句二次高光强调） */}
               <div
                 className="p-3.5 sm:p-4 rounded-xl relative my-3 shadow-xs"
                 style={{
-                  backgroundColor: `${colorHex}15`,
+                  backgroundColor: `${colorHex}12`,
                   borderLeft: `4px solid ${colorHex}`
                 }}
               >
@@ -241,8 +327,12 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
                   <Quote className="w-3.5 h-3.5" />
                   <span>核心划线段落</span>
                 </div>
-                <p className="font-medium text-[15.5px] leading-relaxed">
-                  {contextData.currentParagraph || annotation.selectedText}
+                <p className="text-[15.5px] leading-relaxed">
+                  {renderParagraphWithHighlight(
+                    contextData.currentParagraph,
+                    annotation.selectedText,
+                    colorHex
+                  )}
                 </p>
               </div>
 
@@ -321,8 +411,22 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
             </>
           ) : (
             <div className="py-8 text-center space-y-3">
-              <div className="p-4 rounded-xl bg-paper-sidebar/50 dark:bg-night-sidebar/50 border border-paper-border/60 dark:border-night-border/60 text-left font-serif text-[15px] leading-relaxed">
-                “{annotation.selectedText}”
+              <div
+                className="p-4 rounded-xl text-left font-serif text-[15px] leading-relaxed shadow-xs"
+                style={{
+                  backgroundColor: `${colorHex}12`,
+                  borderLeft: `4px solid ${colorHex}`
+                }}
+              >
+                <mark
+                  className="px-1 py-0.5 rounded-sm font-semibold text-paper-text dark:text-night-text"
+                  style={{
+                    backgroundColor: `${colorHex}45`,
+                    boxShadow: `inset 0 -2px 0 ${colorHex}`
+                  }}
+                >
+                  “{annotation.selectedText}”
+                </mark>
               </div>
               <p className="text-xs text-paper-muted dark:text-night-muted italic">
                 {contextData?.reason === 'FILE_NOT_DOWNLOADED'
@@ -517,15 +621,15 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
             </button>
           </div>
 
-          {/* 右侧：展开居中原文语境按钮 */}
+          {/* 右侧：弹出居中原文语境窗口按钮 */}
           <button
             onClick={handleOpenContextModal}
-            className="flex-shrink-0 flex items-center gap-1 text-[11px] text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text transition-colors py-0.5"
-            title="居中窗口查看前后原文语境"
+            className="flex-shrink-0 flex items-center gap-1 text-[11px] text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors py-0.5"
+            title="打开居中窗口查看原文语境"
           >
             <BookOpen className="w-3 h-3 text-paper-terracotta/80" />
-            <span>展开原文语境</span>
-            <ChevronDown className="w-3 h-3" />
+            <span>查看原文语境</span>
+            <ArrowUpRight className="w-3 h-3 opacity-75" />
           </button>
         </div>
 
