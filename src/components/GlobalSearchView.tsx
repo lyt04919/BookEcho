@@ -7,6 +7,7 @@ import {
   HighlightContextResult
 } from '../../electron/types/ipc';
 import { HighlightCard } from './HighlightCard';
+import { CustomSelect } from './CustomSelect';
 import {
   Search,
   X,
@@ -195,19 +196,23 @@ export const GlobalSearchView: React.FC<GlobalSearchViewProps> = ({
             </span>
 
             {/* 按书籍过滤 */}
-            <select
+            <CustomSelect
               value={selectedBookId}
-              onChange={e => setSelectedBookId(e.target.value)}
-              aria-label="按书籍过滤"
-              className="px-2.5 py-1.5 rounded-lg bg-paper-drawer dark:bg-night-drawer border border-paper-border/60 dark:border-night-border/60 text-paper-text dark:text-night-text max-w-[180px] truncate focus:outline-none"
-            >
-              <option value="all">📚 全部书籍 ({booksWithNotes.length})</option>
-              {booksWithNotes.map(b => (
-                <option key={b.assetId} value={b.assetId}>
-                  《{b.title}》({b.highlightsCount})
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedBookId}
+              ariaLabel="按书籍过滤"
+              icon={<BookOpen className="w-3.5 h-3.5" />}
+              searchPlaceholder="搜索书名..."
+              dropdownWidthClass="w-72"
+              options={[
+                { value: 'all', label: `全部书籍 (${booksWithNotes.length})` },
+                ...booksWithNotes.map(b => ({
+                  value: b.assetId,
+                  label: b.title,
+                  subLabel: b.author || undefined,
+                  count: b.highlightsCount
+                }))
+              ]}
+            />
 
             {/* 仅看有批注 */}
             <button

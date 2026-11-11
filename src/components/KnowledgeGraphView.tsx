@@ -6,6 +6,7 @@ import {
   HighlightContextResult
 } from '../../electron/types/ipc';
 import { HighlightCard } from './HighlightCard';
+import { CustomSelect } from './CustomSelect';
 import {
   Waypoints,
   Tag,
@@ -320,32 +321,39 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
             </div>
 
             {/* 标签过滤下拉 */}
-            <select
+            <CustomSelect
               value={selectedTagFilter}
-              onChange={e => setSelectedTagFilter(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-xs focus:outline-none max-w-[150px] truncate"
-            >
-              <option value="all">全部标签星团 ({activeTags.length})</option>
-              {activeTags.map(t => (
-                <option key={t} value={t}>
-                  #{t} ({tagStats.get(t)?.count || 0})
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedTagFilter}
+              icon={<Tag className="w-3.5 h-3.5" />}
+              searchPlaceholder="搜索标签..."
+              dropdownWidthClass="w-56"
+              options={[
+                { value: 'all', label: `全部标签星团 (${activeTags.length})` },
+                ...activeTags.map(t => ({
+                  value: t,
+                  label: `#${t}`,
+                  count: tagStats.get(t)?.count || 0
+                }))
+              ]}
+            />
 
             {/* 书籍过滤下拉 */}
-            <select
+            <CustomSelect
               value={selectedBookFilter}
-              onChange={e => setSelectedBookFilter(e.target.value)}
-              className="px-2.5 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-xs focus:outline-none max-w-[150px] truncate"
-            >
-              <option value="all">全书库范围 ({books.length})</option>
-              {books.map(b => (
-                <option key={b.assetId} value={b.assetId}>
-                  {b.title}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedBookFilter}
+              icon={<BookOpen className="w-3.5 h-3.5" />}
+              searchPlaceholder="搜索书名..."
+              dropdownWidthClass="w-72"
+              options={[
+                { value: 'all', label: `全书库范围 (${books.length})` },
+                ...books.map(b => ({
+                  value: b.assetId,
+                  label: b.title,
+                  subLabel: b.author || undefined,
+                  count: b.highlightsCount || undefined
+                }))
+              ]}
+            />
 
             {/* 仅看跨书连接开关 */}
             <button
