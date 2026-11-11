@@ -96,11 +96,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-60 h-full flex-shrink-0 flex flex-col justify-between border-r border-paper-border dark:border-night-border bg-paper-sidebar dark:bg-night-sidebar p-4 select-none overflow-hidden">
       {/* 1. 顶部固定区域：Traffic Lights + 应用标题 + 主导航 */}
       <div className="flex-shrink-0 space-y-4 mb-4">
-        {/* macOS Traffic Lights 占位区 */}
-        <div className="h-4"></div>
+        {/* macOS Traffic Lights 占位与窗口拖拽区 */}
+        <div className="h-6 -mt-4 pt-4 -mx-4 px-4 app-drag"></div>
 
-        {/* 软件标题 */}
-        <div className="px-2">
+        {/* 软件标题（支持按住拖拽窗口） */}
+        <div className="px-2 app-drag">
           <h1 className="font-serif text-xl font-bold tracking-wide text-paper-text dark:text-night-text">BookEcho</h1>
           <p className="text-xs text-paper-muted dark:text-night-muted mt-0.5">个人读书精华馆</p>
         </div>

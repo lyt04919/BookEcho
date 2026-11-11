@@ -168,7 +168,7 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
       className="flex-1 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text p-8"
     >
       {/* 顶栏导航 */}
-      <div className="flex items-center justify-between pb-6 mb-8 border-b border-paper-border dark:border-night-border">
+      <div className="flex items-center justify-between pb-6 mb-8 border-b border-paper-border dark:border-night-border app-drag">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 text-sm text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text transition-colors"

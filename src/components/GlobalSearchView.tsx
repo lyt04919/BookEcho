@@ -154,7 +154,7 @@ export const GlobalSearchView: React.FC<GlobalSearchViewProps> = ({
     <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
       {/* 1. 顶部标题与大尺寸智能搜索框 */}
       <div className="max-w-4xl w-full mb-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 app-drag">
           <div>
             <h1 className="font-serif text-3xl font-bold text-paper-text dark:text-night-text flex items-center gap-2.5">
               <Search className="w-7 h-7 text-paper-terracotta dark:text-night-terracotta" />

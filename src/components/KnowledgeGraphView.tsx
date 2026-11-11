@@ -275,7 +275,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text select-none">
       {/* 1. 顶部 Header 与控制栏 */}
-      <header className="flex-shrink-0 p-4 border-b border-paper-border/80 dark:border-night-border/80 bg-paper-card/90 dark:bg-night-card/90 backdrop-blur-md z-10 space-y-3">
+      <header className="flex-shrink-0 pt-7 px-4 pb-4 border-b border-paper-border/80 dark:border-night-border/80 bg-paper-card/90 dark:bg-night-card/90 backdrop-blur-md z-10 space-y-3 app-drag">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* 标题与统计 */}
           <div className="flex items-center gap-3">

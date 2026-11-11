@@ -199,7 +199,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
       {/* 顶部统计横幅 */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4 app-drag">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text whitespace-nowrap">我的书库</h2>

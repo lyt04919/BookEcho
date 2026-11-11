@@ -62,13 +62,15 @@ describe('App State and Orchestration', () => {
     reviewStatus: 'active'
   };
 
-  it('should render default bookshelf view when no error exists', () => {
+  it('should render default bookshelf view with window drag regions when no error exists', () => {
     const html = renderToStaticMarkup(React.createElement(App, null));
     expect(html).toContain('BookEcho');
     expect(html).toContain('全部书架');
     expect(html).toContain('全局搜索');
     expect(html).toContain('知识网络');
     expect(html).toContain('我的书库');
+    expect(html).toContain('data-testid="window-drag-region"');
+    expect(html).toContain('app-drag');
   });
 
   it('should render PermissionGuide when hasPermissionError is true', () => {

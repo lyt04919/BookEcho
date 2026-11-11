@@ -18,3 +18,18 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Inter", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Electron 无边框/隐藏标题栏窗口拖拽支持 */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag,
+.app-drag button,
+.app-drag a,
+.app-drag input,
+.app-drag textarea,
+.app-drag select,
+.app-drag [role="button"] {
+  -webkit-app-region: no-drag;
+}

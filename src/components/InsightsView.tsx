@@ -117,7 +117,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
       {/* 标题区 */}
-      <div className="pb-6 mb-8 border-b border-paper-border dark:border-night-border">
+      <div className="pb-6 mb-8 border-b border-paper-border dark:border-night-border app-drag">
         <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text flex items-center gap-2.5">
           <BarChart3 className="w-7 h-7 text-paper-terracotta dark:text-night-terracotta" />
           <span>阅读足迹与思考洞察</span>

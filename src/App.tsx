@@ -706,7 +706,7 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* 演示测试数据专属顶部提示横幅 */}
         {isDemoMode && (
-          <div className="flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 z-20">
+          <div className="flex items-center justify-between px-4 pt-6 pb-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 z-20 app-drag">
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               <span>
@@ -797,7 +797,7 @@ export default function App() {
         ) : currentTab === 'starred_notes' ? (
           /* 批注与星标独立专属汇总馆 */
           <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4 app-drag">
               <div>
                 <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text flex items-center gap-2">
                   <MessageSquareQuote className="w-7 h-7 text-paper-terracotta dark:text-night-terracotta" />
@@ -999,6 +999,13 @@ export default function App() {
           onClose={() => setIsColorSettingsOpen(false)}
         />
       )}
+
+      {/* 全局窗口顶部无边框拖拽条（避开左上角红绿灯） */}
+      <div
+        className="fixed top-0 left-20 right-0 h-6 z-30 app-drag"
+        aria-hidden="true"
+        data-testid="window-drag-region"
+      />
     </div>
   );
 }
