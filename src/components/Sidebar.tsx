@@ -15,7 +15,8 @@ import {
   Sparkles,
   Palette,
   X,
-  Plus
+  Plus,
+  Settings
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
@@ -49,6 +50,7 @@ export interface SidebarProps {
   isDemoMode?: boolean;
   onToggleDemoMode?: () => void;
   onOpenColorSettings?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -74,7 +76,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isRefreshing = false,
   isDemoMode = false,
   onToggleDemoMode,
-  onOpenColorSettings
+  onOpenColorSettings,
+  onOpenSettings
 }) => {
   // 用户手动标记的重点书单（支持在书架、书页及侧边栏增删）
   const pinnedSet = new Set(pinnedBookIds);
@@ -360,6 +363,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <FolderOpen className="w-3.5 h-3.5" />
           <span>切换数据目录</span>
         </button>
+
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors"
+            title="偏好设置 (⌘,)"
+          >
+            <span className="flex items-center gap-2">
+              <Settings className="w-3.5 h-3.5 text-paper-terracotta/80" />
+              <span>偏好设置</span>
+            </span>
+            <kbd className="px-1.5 py-0.2 rounded bg-black/5 dark:bg-white/10 font-mono text-[10px] text-paper-muted/80">
+              ⌘,
+            </kbd>
+          </button>
+        )}
 
         <button
           onClick={onToggleDarkMode}

@@ -3,12 +3,18 @@ import { X, FileText, CheckCircle2 } from 'lucide-react';
 
 export interface ExportModalProps {
   bookTitle: string;
+  defaultFormat?: 'standard' | 'obsidian';
   onClose: () => void;
   onConfirmExport: (format: 'standard' | 'obsidian') => Promise<void>;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ bookTitle, onClose, onConfirmExport }) => {
-  const [format, setFormat] = useState<'standard' | 'obsidian'>('obsidian');
+export const ExportModal: React.FC<ExportModalProps> = ({
+  bookTitle,
+  defaultFormat = 'obsidian',
+  onClose,
+  onConfirmExport
+}) => {
+  const [format, setFormat] = useState<'standard' | 'obsidian'>(defaultFormat);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {

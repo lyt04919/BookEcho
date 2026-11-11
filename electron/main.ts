@@ -273,7 +273,12 @@ function registerIpcHandlers() {
     vault.updateColorSemantic(colorKey, label, hexColor);
   });
 
-  const ALLOWED_UI_SETTINGS = new Set(['pinned_book_ids', 'hidden_book_ids']);
+  const ALLOWED_UI_SETTINGS = new Set([
+    'pinned_book_ids',
+    'hidden_book_ids',
+    'custom_apple_books_dir',
+    'export_format'
+  ]);
 
   ipcMain.handle('settings:get', async (_, key: string) => {
     if (!ALLOWED_UI_SETTINGS.has(key)) return null;
@@ -283,6 +288,9 @@ function registerIpcHandlers() {
   ipcMain.handle('settings:set', async (_, key: string, value: string) => {
     if (!ALLOWED_UI_SETTINGS.has(key)) return;
     vault.setSetting(key, value);
+    if (key === 'custom_apple_books_dir') {
+      initializeServices();
+    }
   });
 
   ipcMain.handle('system:openAppleBooks', async (_, _assetId: string, epubPath?: string | null) => {

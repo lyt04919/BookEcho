@@ -19,6 +19,7 @@ import { InsightsView } from './components/InsightsView';
 import { GlobalSearchView } from './components/GlobalSearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
 import { ColorSemanticsModal } from './components/ColorSemanticsModal';
+import { SettingsModal, SettingsTabId } from './components/SettingsModal';
 import { DEMO_BOOKS, DEMO_TAGS, DEMO_ANNOTATIONS } from './data/mockTestData';
 import { MessageSquareQuote, Download, Sparkles, X } from 'lucide-react';
 
@@ -71,6 +72,10 @@ export default function App() {
   const [demoTags, setDemoTags] = useState<string[]>(DEMO_TAGS);
   const [demoAnnotations, setDemoAnnotations] = useState<AnnotationItem[]>(DEMO_ANNOTATIONS);
   const [isColorSettingsOpen, setIsColorSettingsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>('general');
+  const [customDataDir, setCustomDataDir] = useState<string | null>(null);
+  const [exportFormatPref, setExportFormatPref] = useState<'standard' | 'obsidian'>('obsidian');
   const [pinnedBookIds, setPinnedBookIds] = useState<string[]>([]);
   const [demoPinnedBookIds, setDemoPinnedBookIds] = useState<string[]>([
     'demo-book-naval',
@@ -98,13 +103,15 @@ export default function App() {
   const loadInitialData = async () => {
     try {
       if (typeof window !== 'undefined' && window.bookEchoAPI) {
-        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw] = await Promise.all([
+        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw, customDirRaw, exportFmtRaw] = await Promise.all([
           window.bookEchoAPI.getBooks(),
           window.bookEchoAPI.getColorSemantics(),
           window.bookEchoAPI.getAllTags(),
           window.bookEchoAPI.getBookAnnotations(),
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('pinned_book_ids') : Promise.resolve(null),
-          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('hidden_book_ids') : Promise.resolve(null)
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('hidden_book_ids') : Promise.resolve(null),
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('custom_apple_books_dir') : Promise.resolve(null),
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('export_format') : Promise.resolve(null)
         ]);
         setBooks(fetchedBooks || []);
         if (semantics && semantics.length > 0) {
@@ -114,6 +121,10 @@ export default function App() {
         if (parsedPinned) setPinnedBookIds(parsedPinned);
         const parsedHidden = parseStringArraySetting(hiddenRaw);
         if (parsedHidden) setHiddenBookIds(parsedHidden);
+        if (customDirRaw) setCustomDataDir(customDirRaw);
+        if (exportFmtRaw === 'standard' || exportFmtRaw === 'obsidian') {
+          setExportFormatPref(exportFmtRaw);
+        }
         setTags(fetchedTags || []);
         setAllAnnotations(allAnnos || []);
         setHasPermissionError(false);
@@ -152,6 +163,10 @@ export default function App() {
         e.preventDefault();
         setSelectedTag(null);
         setCurrentTab('search');
+      } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        setSettingsInitialTab('general');
+        setIsSettingsOpen(prev => !prev);
       } else if (e.key === 'Escape') {
         const target = e.target as { tagName?: string } | null;
         if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
@@ -365,6 +380,40 @@ export default function App() {
       } catch (err) {
         console.error('Failed to save color semantics', err);
       }
+    }
+  };
+
+  const handleOpenSettings = (tab: SettingsTabId = 'general') => {
+    setSettingsInitialTab(tab);
+    setIsSettingsOpen(true);
+  };
+
+  const handleOpenColorSettings = () => {
+    handleOpenSettings('highlights');
+  };
+
+  const handleSelectCustomDir = async () => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      const selected = await window.bookEchoAPI.selectCustomDataDir();
+      if (selected) {
+        setCustomDataDir(selected);
+        loadInitialData();
+      }
+    }
+  };
+
+  const handleResetCustomDir = async () => {
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      await window.bookEchoAPI.setSetting('custom_apple_books_dir', '');
+      setCustomDataDir(null);
+      loadInitialData();
+    }
+  };
+
+  const handleUpdateExportFormat = async (fmt: 'standard' | 'obsidian') => {
+    setExportFormatPref(fmt);
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      await window.bookEchoAPI.setSetting('export_format', fmt);
     }
   };
 
@@ -672,12 +721,7 @@ export default function App() {
         onSelectTag={setSelectedTag}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
-        onSelectCustomDir={async () => {
-          if (typeof window !== 'undefined' && window.bookEchoAPI) {
-            await window.bookEchoAPI.selectCustomDataDir();
-            loadInitialData();
-          }
-        }}
+        onSelectCustomDir={handleSelectCustomDir}
         books={activeBooks}
         pinnedBookIds={activePinnedBookIds}
         onTogglePinBook={handleTogglePinBook}
@@ -700,7 +744,8 @@ export default function App() {
           setActiveChapter(null);
           setReadingChapterContent(null);
         }}
-        onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+        onOpenColorSettings={handleOpenColorSettings}
+        onOpenSettings={() => handleOpenSettings('general')}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -748,7 +793,7 @@ export default function App() {
               setSelectedBook(null);
               setCurrentTab('graph');
             }}
-            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onOpenColorSettings={handleOpenColorSettings}
             onUpdateChapter={handleUpdateChapter}
             onCreateTag={handleCreateGlobalTag}
             onRenameTag={handleRenameGlobalTag}
@@ -768,7 +813,7 @@ export default function App() {
             annotations={activeAnnotations}
             colorSemantics={colorSemantics}
             onSelectBook={handleSelectBook}
-            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onOpenColorSettings={handleOpenColorSettings}
           />
         ) : currentTab === 'search' ? (
           <GlobalSearchView
@@ -784,7 +829,7 @@ export default function App() {
               setSelectedBook(null);
               setCurrentTab('graph');
             }}
-            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onOpenColorSettings={handleOpenColorSettings}
             onUpdateChapter={handleUpdateChapter}
             onToggleStar={handleToggleStar}
             onUpdateCustomNote={handleUpdateCustomNote}
@@ -856,7 +901,7 @@ export default function App() {
                         setSelectedBook(null);
                         setCurrentTab('graph');
                       }}
-                      onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+                      onOpenColorSettings={handleOpenColorSettings}
                       onUpdateChapter={handleUpdateChapter}
                       onToggleStar={handleToggleStar}
                       onUpdateCustomNote={handleUpdateCustomNote}
@@ -883,7 +928,7 @@ export default function App() {
               setSelectedBook(null);
               setCurrentTab('graph');
             }}
-            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onOpenColorSettings={handleOpenColorSettings}
             onUpdateChapter={handleUpdateChapter}
             onBack={() => {
               setSelectedBook(null);
@@ -951,6 +996,7 @@ export default function App() {
       {exportBookAssetId && exportingBook && (
         <ExportModal
           bookTitle={exportingBook.title}
+          defaultFormat={exportFormatPref}
           onClose={() => setExportBookAssetId(null)}
           onConfirmExport={async fmt => {
             if (isDemoMode || !window.bookEchoAPI) {
@@ -990,7 +1036,32 @@ export default function App() {
         />
       )}
 
-      {/* 高亮颜色语义与配色自定义弹窗 */}
+      {/* 偏好设置面板（支持 Cmd + , 快捷键与各模块 Tab） */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        initialTab={settingsInitialTab}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        colorSemantics={colorSemantics}
+        onSaveColorSemantics={handleSaveColorSemantics}
+        customDataDir={customDataDir}
+        onSelectCustomDir={handleSelectCustomDir}
+        onResetCustomDir={handleResetCustomDir}
+        isDemoMode={isDemoMode}
+        onToggleDemoMode={() => {
+          setIsDemoMode(prev => !prev);
+          setSelectedBook(null);
+          setSelectedTag(null);
+          setBookChapters([]);
+          setActiveChapter(null);
+          setReadingChapterContent(null);
+        }}
+        exportFormat={exportFormatPref}
+        onUpdateExportFormat={handleUpdateExportFormat}
+      />
+
+      {/* 高亮颜色语义与配色自定义弹窗（向后兼容） */}
       {isColorSettingsOpen && (
         <ColorSemanticsModal
           colorSemantics={colorSemantics}

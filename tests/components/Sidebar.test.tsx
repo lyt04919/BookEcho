@@ -207,6 +207,13 @@ describe('Sidebar Component', () => {
     darkModeBtn.props.onClick();
     expect(onToggleDarkMode).toHaveBeenCalled();
   });
+
+  it('should render settings button and trigger onOpenSettings when provided', () => {
+    const onOpenSettings = vi.fn();
+    const html = renderToStaticMarkup(<Sidebar {...defaultProps} onOpenSettings={onOpenSettings} />);
+    expect(html).toContain('偏好设置');
+    expect(html).toContain('⌘,');
+  });
 });
 
 describe('App Integration with Sidebar', () => {
