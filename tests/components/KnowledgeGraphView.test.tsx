@@ -96,9 +96,29 @@ describe('KnowledgeGraphView Component', () => {
     expect(html).toContain('仅看连接');
     expect(html).toContain('标签枢纽');
     expect(html).toContain('读书高亮节点');
-    expect(html).toContain('主题成簇');
-    expect(html).toContain('共鸣瀑布流');
+    expect(html).toContain('按标签分组');
+    expect(html).toContain('全部平铺');
+    expect(html).toContain('按书籍分组');
     expect(html).toContain('追求财富，而不是追求金钱或地位。');
+  });
+
+  it('should show clear tag-empty guidance banner when there are no tags in topic-clusters mode', () => {
+    const html = renderToStaticMarkup(
+      <KnowledgeGraphView
+        annotations={mockAnnotations.map(a => ({ ...a, tags: [] }))}
+        books={mockBooks}
+        colorSemantics={mockColorSemantics}
+        availableTags={[]}
+        onSelectBook={vi.fn()}
+        onToggleStar={vi.fn()}
+        onUpdateCustomNote={vi.fn()}
+        onAddTag={vi.fn()}
+        onRemoveTag={vi.fn()}
+        onOpenQuoteModal={vi.fn()}
+        onRequestContext={vi.fn()}
+      />
+    );
+    expect(html).toContain('切换为「按书籍分组」');
   });
 
   it('should render the connected node drawer when initialFocusedNodeId is provided', () => {

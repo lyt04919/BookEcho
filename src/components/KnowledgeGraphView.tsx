@@ -308,10 +308,10 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                     ? 'bg-paper-terracotta dark:bg-night-terracotta text-white shadow-2xs'
                     : 'text-paper-muted hover:text-paper-text'
                 }`}
-                title="按标签主题独立成簇展示"
+                title="按自定义 #标签 主题分组聚合跨书笔记"
               >
                 <Columns className="w-3.5 h-3.5" />
-                <span>主题成簇</span>
+                <span>按标签分组</span>
               </button>
 
               <button
@@ -321,10 +321,10 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                     ? 'bg-paper-terracotta dark:bg-night-terracotta text-white shadow-2xs'
                     : 'text-paper-muted hover:text-paper-text'
                 }`}
-                title="全量高亮瀑布流，悬停标签全局共鸣发光"
+                title="全部高亮卡片网格平铺，悬停标签可高亮关联卡片"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>共鸣瀑布流</span>
+                <span>全部平铺</span>
               </button>
 
               <button
@@ -334,10 +334,10 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                     ? 'bg-paper-terracotta dark:bg-night-terracotta text-white shadow-2xs'
                     : 'text-paper-muted hover:text-paper-text'
                 }`}
-                title="按书籍聚类展示划线"
+                title="按书籍分组展示划线"
               >
                 <Library className="w-3.5 h-3.5" />
-                <span>书籍分组</span>
+                <span>按书籍分组</span>
               </button>
             </div>
 
@@ -717,9 +717,26 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                 );
               })}
 
-            {/* 未打标签的高亮在主题成簇模式下补充在底部 */}
+            {/* 未打标签的高亮在按标签分组模式下补充在底部，并给出清晰引导 */}
             {activeTags.length === 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-paper-card dark:bg-night-card border border-dashed border-paper-border dark:border-night-border flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-paper-muted dark:text-night-muted">
+                    <Tag className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta flex-shrink-0" />
+                    <span>
+                      当前暂无 <strong className="text-paper-text dark:text-night-text">#标签</strong>，给不同书的卡片点按左下角 <code className="px-1 py-0.5 rounded bg-paper-drawer dark:bg-night-drawer">+ 标签</code> 后，即可在此自动按主题聚合成组。
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('book-clusters')}
+                    className="px-3 py-1.5 rounded-lg bg-paper-drawer dark:bg-night-drawer hover:bg-paper-terracotta hover:text-white text-paper-text dark:text-night-text font-medium transition-colors flex-shrink-0"
+                  >
+                    切换为「按书籍分组」
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filteredAnnotations.map(anno => {
                   const b = bookMap.get(anno.assetId);
                   return (
@@ -755,6 +772,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </div>
