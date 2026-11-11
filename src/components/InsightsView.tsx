@@ -3,7 +3,9 @@ import {
   BookItem,
   AnnotationItem,
   ColorSemanticConfig,
-  HighlightColor
+  HighlightColor,
+  AppleBooksReadingStats,
+  DailyReadingStat
 } from '../../electron/types/ipc';
 import {
   BarChart3,
@@ -19,7 +21,10 @@ import {
   Flame,
   Hash,
   ArrowUpRight,
-  Layers
+  Layers,
+  Timer,
+  Target,
+  CheckCircle2
 } from 'lucide-react';
 
 export interface InsightsViewProps {
@@ -27,10 +32,23 @@ export interface InsightsViewProps {
   annotations: AnnotationItem[];
   colorSemantics: ColorSemanticConfig[];
   hiddenBookIds?: string[];
+  readingStats?: AppleBooksReadingStats | null;
   onSelectBook: (book: BookItem) => void;
   onOpenColorSettings?: () => void;
   onOpenTagInGraph?: (tag: string) => void;
   defaultSelectedDate?: string | null;
+}
+
+export function formatReadingDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return '0 分钟';
+  if (seconds < 60) return `${Math.round(seconds)} 秒`;
+  if (seconds < 3600) {
+    const mins = seconds / 60;
+    const formatted = mins < 10 ? mins.toFixed(1).replace(/\.0$/, '') : String(Math.round(mins));
+    return `${formatted} 分钟`;
+  }
+  const hours = (seconds / 3600).toFixed(1).replace(/\.0$/, '');
+  return `${hours} 小时`;
 }
 
 export function resolveAnnotationTimestamp(anno: AnnotationItem): number {
@@ -225,6 +243,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   annotations,
   colorSemantics,
   hiddenBookIds = [],
+  readingStats = null,
   onSelectBook,
   onOpenColorSettings,
   onOpenTagInGraph,
@@ -232,6 +251,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(defaultSelectedDate);
   const [rangeKey, setRangeKey] = useState<string>('rolling_year');
+  const [heatmapMode, setHeatmapMode] = useState<'highlights' | 'duration'>('highlights');
 
   const hiddenSet = useMemo(() => new Set(hiddenBookIds), [hiddenBookIds]);
   const visibleBooks = useMemo(
@@ -293,6 +313,12 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       }
     }
 
+    if (readingStats?.dailyHistory) {
+      for (const d of readingStats.dailyHistory) {
+        if (d.date.length >= 4) years.add(d.date.slice(0, 4));
+      }
+    }
+
     return {
       dateMap: map,
       dateCountMap: counts,
@@ -300,16 +326,68 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       monthCurrentCount: curMonth,
       monthPrevCount: prevMonth
     };
-  }, [annotations]);
+  }, [annotations, readingStats]);
 
-  const streaks = useMemo(() => calculateStreaks(Object.keys(dateMap)), [dateMap]);
+  // Apple Books 每日阅读时长索引与当日打开书籍索引
+  const { readingTimeMap, readingMinutesCountMap, recentReadingDays } = useMemo(() => {
+    const tMap: Record<string, DailyReadingStat> = {};
+    const mMap: Record<string, number> = {};
+    const history = readingStats?.dailyHistory || [];
+    for (const item of history) {
+      tMap[item.date] = item;
+      if (item.readingTimeSec > 0) {
+        mMap[item.date] = Math.max(1, Math.round(item.readingTimeSec / 60));
+      }
+    }
+    return {
+      readingTimeMap: tMap,
+      readingMinutesCountMap: mMap,
+      recentReadingDays: history.slice(-14)
+    };
+  }, [readingStats]);
+
+  const booksOpenedByDate = useMemo(() => {
+    const map: Record<string, BookItem[]> = {};
+    for (const b of visibleBooks) {
+      if (b.lastOpenDateMs) {
+        const key = toDateKey(b.lastOpenDateMs);
+        if (key !== '未知日期') {
+          if (!map[key]) map[key] = [];
+          map[key].push(b);
+        }
+      }
+    }
+    return map;
+  }, [visibleBooks]);
+
+  const effectiveHeatmapMode = readingStats?.available && readingStats.dailyHistory.length > 0 ? heatmapMode : 'highlights';
+  const activeHeatmapCounts = effectiveHeatmapMode === 'duration' ? readingMinutesCountMap : dateCountMap;
+
+  const streaks = useMemo(() => {
+    const keys =
+      effectiveHeatmapMode === 'duration' ? Object.keys(readingMinutesCountMap) : Object.keys(dateMap);
+    return calculateStreaks(keys);
+  }, [effectiveHeatmapMode, readingMinutesCountMap, dateMap]);
 
   const { weeks, monthLabels } = useMemo(
-    () => buildCalendarWeeks(dateCountMap, rangeKey),
-    [dateCountMap, rangeKey]
+    () => buildCalendarWeeks(activeHeatmapCounts, rangeKey),
+    [activeHeatmapCounts, rangeKey]
   );
 
   const activeDatesSorted = useMemo(() => {
+    if (effectiveHeatmapMode === 'duration') {
+      const entries = Object.entries(readingTimeMap).filter(([, s]) => s.readingTimeSec > 0);
+      const filtered =
+        rangeKey === 'rolling_year' ? entries : entries.filter(([dateKey]) => dateKey.startsWith(rangeKey));
+      return (filtered.length > 0 ? filtered : entries)
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .slice(0, 12)
+        .map(([dateKey, stat]) => ({
+          dateKey,
+          label: `${dateKey} (${formatReadingDuration(stat.readingTimeSec)})`
+        }));
+    }
+
     const entries = Object.entries(dateMap);
     const filtered =
       rangeKey === 'rolling_year'
@@ -317,8 +395,12 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         : entries.filter(([dateKey]) => dateKey.startsWith(rangeKey));
     return (filtered.length > 0 ? filtered : entries)
       .sort((a, b) => b[0].localeCompare(a[0]))
-      .slice(0, 12);
-  }, [dateMap, rangeKey]);
+      .slice(0, 12)
+      .map(([dateKey, items]) => ({
+        dateKey,
+        label: `${dateKey} (${items.length})`
+      }));
+  }, [effectiveHeatmapMode, readingTimeMap, dateMap, rangeKey]);
 
   // 3. 阅读生物钟 & 周节律
   const rhythm = useMemo(() => computeReadingRhythm(annotations), [annotations]);
@@ -390,7 +472,17 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   }, [annotations, booksWithNotes]);
 
   const selectedDateAnnotations = selectedDate ? dateMap[selectedDate] || [] : [];
+  const selectedDayReading = selectedDate ? readingTimeMap[selectedDate] : undefined;
+  const selectedDayOpenedBooks = selectedDate ? booksOpenedByDate[selectedDate] || [] : [];
   const monthDelta = monthCurrentCount - monthPrevCount;
+
+  const todayGoalPct =
+    readingStats && readingStats.dailyGoalSec > 0
+      ? Math.min(100, Math.round((readingStats.todayReadingSec / readingStats.dailyGoalSec) * 100))
+      : 0;
+  const todayGoalMet = Boolean(
+    readingStats && readingStats.dailyGoalSec > 0 && readingStats.todayReadingSec >= readingStats.dailyGoalSec
+  );
 
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
@@ -473,6 +565,149 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         </div>
       </div>
 
+      {/* 1.5 Apple Books 每日阅读时长与目标卡片（直接读取 Apple Books 本地统计） */}
+      {readingStats?.available && (
+        <div
+          data-testid="insights-reading-duration"
+          className="mb-8 p-6 rounded-2xl bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border shadow-2xs"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-2">
+              <Timer className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta" />
+              <h3 className="font-serif text-base font-bold text-paper-text dark:text-night-text">
+                Apple Books 每日阅读时长与目标
+              </h3>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted">
+                同步自 Apple Books 统计
+              </span>
+            </div>
+            {readingStats.yearlyBooksFinishedGoal > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-paper-muted dark:text-night-muted">
+                <Target className="w-3.5 h-3.5 text-amber-500" />
+                <span>
+                  年度完书目标：<strong className="text-paper-text dark:text-night-text font-mono">{readingStats.currentYearBooksFinished} / {readingStats.yearlyBooksFinishedGoal}</strong> 本
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* 左：今日进度 & 累计统计 */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="p-4 rounded-xl bg-paper-drawer/70 dark:bg-night-drawer/70 border border-paper-border/50 dark:border-night-border/50 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-paper-muted dark:text-night-muted font-medium">今日阅读进度</span>
+                  {todayGoalMet ? (
+                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>已达成目标</span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-paper-muted dark:text-night-muted">{todayGoalPct}%</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="font-serif text-2xl font-bold text-paper-text dark:text-night-text">
+                    {formatReadingDuration(readingStats.todayReadingSec)}
+                  </span>
+                  {readingStats.dailyGoalSec > 0 && (
+                    <span className="text-xs text-paper-muted dark:text-night-muted">
+                      每日目标 {formatReadingDuration(readingStats.dailyGoalSec)}
+                    </span>
+                  )}
+                </div>
+                <div className="w-full h-2 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      todayGoalMet
+                        ? 'bg-emerald-500'
+                        : 'bg-paper-terracotta dark:bg-night-terracotta'
+                    }`}
+                    style={{ width: `${Math.max(readingStats.todayReadingSec > 0 ? 4 : 0, todayGoalPct)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-paper-drawer/50 dark:bg-night-drawer/50">
+                  <div className="text-[11px] text-paper-muted dark:text-night-muted">累计记录时长</div>
+                  <div className="font-serif text-base font-bold text-paper-text dark:text-night-text mt-0.5">
+                    {formatReadingDuration(readingStats.totalReadingSec)}
+                  </div>
+                  <div className="text-[10px] text-paper-muted/80 dark:text-night-muted/80">
+                    覆盖 {readingStats.dailyHistory.length} 个阅读日
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-paper-drawer/50 dark:bg-night-drawer/50">
+                  <div className="text-[11px] text-paper-muted dark:text-night-muted">目标连续达标</div>
+                  <div className="font-serif text-base font-bold text-paper-text dark:text-night-text mt-0.5">
+                    {readingStats.currentStreakDays} 天
+                  </div>
+                  <div className="text-[10px] text-paper-muted/80 dark:text-night-muted/80">
+                    历史最长 {readingStats.allTimeRecordStreakDays} 天
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 右：近期每日阅读时长趋势柱状图 */}
+            <div className="lg:col-span-7">
+              <div className="flex items-center justify-between text-xs text-paper-muted dark:text-night-muted mb-3">
+                <span>近期活跃日每日阅读时长</span>
+                <span className="text-[11px]">点击任意柱条可查看当日书籍与划线</span>
+              </div>
+              {recentReadingDays.length === 0 ? (
+                <p className="text-xs text-paper-muted py-8 text-center">暂无每日阅读时长记录</p>
+              ) : (
+                <div className="h-32 flex items-end gap-2 pt-3 border-b border-paper-border/60 dark:border-night-border/60 pb-1">
+                  {(() => {
+                    const maxSec = Math.max(
+                      readingStats.dailyGoalSec || 1200,
+                      ...recentReadingDays.map(d => d.readingTimeSec)
+                    );
+                    return recentReadingDays.map(day => {
+                      const pct = Math.max(8, Math.round((day.readingTimeSec / maxSec) * 100));
+                      const isSelected = selectedDate === day.date;
+                      const mins = Math.max(1, Math.round(day.readingTimeSec / 60));
+                      return (
+                        <button
+                          type="button"
+                          key={day.date}
+                          onClick={() => setSelectedDate(isSelected ? null : day.date)}
+                          title={`${day.date}：阅读 ${formatReadingDuration(day.readingTimeSec)}${day.goalMet ? '（已达标）' : ''}`}
+                          className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer"
+                        >
+                          <span className="text-[9px] font-mono text-paper-muted dark:text-night-muted mb-1 opacity-80 group-hover:opacity-100">
+                            {mins}m
+                          </span>
+                          <div
+                            style={{ height: `${pct}%` }}
+                            className={`w-full max-w-[26px] rounded-t-md transition-all ${
+                              day.goalMet
+                                ? 'bg-emerald-500/80 dark:bg-emerald-400/80 group-hover:bg-emerald-500'
+                                : 'bg-paper-terracotta/65 dark:bg-night-terracotta/65 group-hover:bg-paper-terracotta'
+                            } ${isSelected ? 'ring-2 ring-paper-text dark:ring-night-text' : ''}`}
+                          />
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+              {recentReadingDays.length > 0 && (
+                <div className="flex gap-2 text-[9px] font-mono text-paper-muted dark:text-night-muted mt-1.5 text-center">
+                  {recentReadingDays.map(day => (
+                    <span key={day.date} className="flex-1 truncate">
+                      {day.date.slice(5)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. 年度日历热力图与按日回溯 */}
       <div className="mb-8 p-6 rounded-2xl bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -499,33 +734,63 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             </div>
           </div>
 
-          {/* 年份与周期切换 */}
-          <div className="flex items-center gap-1 bg-paper-drawer dark:bg-night-drawer p-0.5 rounded-lg border border-paper-border/60 dark:border-night-border text-xs">
-            <button
-              type="button"
-              onClick={() => setRangeKey('rolling_year')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
-                rangeKey === 'rolling_year'
-                  ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-2xs'
-                  : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
-              }`}
-            >
-              近一年
-            </button>
-            {availableYears.slice(0, 4).map(yr => (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 维度切换：按划线笔记 vs 按阅读时长 */}
+            {readingStats?.available && readingStats.dailyHistory.length > 0 && (
+              <div className="flex items-center gap-1 bg-paper-drawer dark:bg-night-drawer p-0.5 rounded-lg border border-paper-border/60 dark:border-night-border text-xs">
+                <button
+                  type="button"
+                  onClick={() => setHeatmapMode('highlights')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${
+                    effectiveHeatmapMode === 'highlights'
+                      ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-2xs'
+                      : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+                  }`}
+                >
+                  按划线笔记
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHeatmapMode('duration')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${
+                    effectiveHeatmapMode === 'duration'
+                      ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-2xs'
+                      : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+                  }`}
+                >
+                  按阅读时长
+                </button>
+              </div>
+            )}
+
+            {/* 年份与周期切换 */}
+            <div className="flex items-center gap-1 bg-paper-drawer dark:bg-night-drawer p-0.5 rounded-lg border border-paper-border/60 dark:border-night-border text-xs">
               <button
                 type="button"
-                key={yr}
-                onClick={() => setRangeKey(yr)}
-                className={`px-2.5 py-1 rounded-md transition-colors font-mono ${
-                  rangeKey === yr
+                onClick={() => setRangeKey('rolling_year')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  rangeKey === 'rolling_year'
                     ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-2xs'
                     : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                 }`}
               >
-                {yr}
+                近一年
               </button>
-            ))}
+              {availableYears.slice(0, 4).map(yr => (
+                <button
+                  type="button"
+                  key={yr}
+                  onClick={() => setRangeKey(yr)}
+                  className={`px-2.5 py-1 rounded-md transition-colors font-mono ${
+                    rangeKey === yr
+                      ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-2xs'
+                      : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+                  }`}
+                >
+                  {yr}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -566,25 +831,46 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                         return <div key={cell.dateKey} className="w-[11px] h-[11px]" />;
                       }
                       const isSelected = selectedDate === cell.dateKey;
-                      const colorClass =
-                        cell.count === 0
-                          ? 'bg-paper-drawer dark:bg-night-drawer'
-                          : cell.count <= 2
-                          ? 'bg-paper-terracotta/35 dark:bg-night-terracotta/35'
-                          : cell.count <= 5
-                          ? 'bg-paper-terracotta/65 dark:bg-night-terracotta/65'
-                          : 'bg-paper-terracotta dark:bg-night-terracotta';
+                      const dayDuration = readingTimeMap[cell.dateKey];
+                      let colorClass = 'bg-paper-drawer dark:bg-night-drawer';
+                      if (effectiveHeatmapMode === 'duration') {
+                        const sec = dayDuration?.readingTimeSec || 0;
+                        const goal = dayDuration?.readingGoalSec || 1200;
+                        if (sec > 0) {
+                          if (sec < goal * 0.5) colorClass = 'bg-emerald-500/30 dark:bg-emerald-400/30';
+                          else if (sec < goal) colorClass = 'bg-emerald-500/60 dark:bg-emerald-400/60';
+                          else colorClass = 'bg-emerald-500 dark:bg-emerald-400';
+                        }
+                      } else if (cell.count > 0) {
+                        colorClass =
+                          cell.count <= 2
+                            ? 'bg-paper-terracotta/35 dark:bg-night-terracotta/35'
+                            : cell.count <= 5
+                            ? 'bg-paper-terracotta/65 dark:bg-night-terracotta/65'
+                            : 'bg-paper-terracotta dark:bg-night-terracotta';
+                      }
+
+                      const tooltip =
+                        effectiveHeatmapMode === 'duration'
+                          ? `${cell.dateKey}: ${
+                              dayDuration ? `阅读 ${formatReadingDuration(dayDuration.readingTimeSec)}` : '无阅读记录'
+                            }`
+                          : `${cell.dateKey}: ${cell.count} 条划线${
+                              dayDuration ? `（当日阅读 ${formatReadingDuration(dayDuration.readingTimeSec)}）` : ''
+                            }`;
+
+                      const isClickable = cell.count > 0 || Boolean(dayDuration && dayDuration.readingTimeSec > 0);
 
                       return (
                         <button
                           type="button"
                           key={cell.dateKey}
                           onClick={() =>
-                            cell.count > 0 && setSelectedDate(isSelected ? null : cell.dateKey)
+                            isClickable && setSelectedDate(isSelected ? null : cell.dateKey)
                           }
-                          title={`${cell.dateKey}: ${cell.count} 条记录`}
+                          title={tooltip}
                           className={`w-[11px] h-[11px] rounded-[2px] transition-transform ${colorClass} ${
-                            cell.count > 0 ? 'cursor-pointer hover:scale-125' : 'cursor-default'
+                            isClickable ? 'cursor-pointer hover:scale-125' : 'cursor-default'
                           } ${isSelected ? 'ring-2 ring-paper-text dark:ring-night-text ring-offset-1 dark:ring-offset-night-card' : ''}`}
                         />
                       );
@@ -601,7 +887,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           {activeDatesSorted.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-paper-muted dark:text-night-muted mr-1">活跃阅读日：</span>
-              {activeDatesSorted.map(([dateKey, items]) => {
+              {activeDatesSorted.map(({ dateKey, label }) => {
                 const isSelected = selectedDate === dateKey;
                 return (
                   <button
@@ -614,35 +900,67 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                         : 'bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                     }`}
                   >
-                    {dateKey} ({items.length})
+                    {label}
                   </button>
                 );
               })}
             </div>
           ) : (
-            <span className="text-xs text-paper-muted dark:text-night-muted">暂无带时间戳的高亮记录</span>
+            <span className="text-xs text-paper-muted dark:text-night-muted">暂无带时间戳的活跃记录</span>
           )}
 
           <div className="flex items-center gap-1.5 text-[10px] text-paper-muted dark:text-night-muted flex-shrink-0">
             <span>少</span>
             <span className="w-[10px] h-[10px] rounded-[2px] bg-paper-drawer dark:bg-night-drawer" />
-            <span className="w-[10px] h-[10px] rounded-[2px] bg-paper-terracotta/35 dark:bg-night-terracotta/35" />
-            <span className="w-[10px] h-[10px] rounded-[2px] bg-paper-terracotta/65 dark:bg-night-terracotta/65" />
-            <span className="w-[10px] h-[10px] rounded-[2px] bg-paper-terracotta dark:bg-night-terracotta" />
+            <span
+              className={`w-[10px] h-[10px] rounded-[2px] ${
+                effectiveHeatmapMode === 'duration'
+                  ? 'bg-emerald-500/30 dark:bg-emerald-400/30'
+                  : 'bg-paper-terracotta/35 dark:bg-night-terracotta/35'
+              }`}
+            />
+            <span
+              className={`w-[10px] h-[10px] rounded-[2px] ${
+                effectiveHeatmapMode === 'duration'
+                  ? 'bg-emerald-500/60 dark:bg-emerald-400/60'
+                  : 'bg-paper-terracotta/65 dark:bg-night-terracotta/65'
+              }`}
+            />
+            <span
+              className={`w-[10px] h-[10px] rounded-[2px] ${
+                effectiveHeatmapMode === 'duration'
+                  ? 'bg-emerald-500 dark:bg-emerald-400'
+                  : 'bg-paper-terracotta dark:bg-night-terracotta'
+              }`}
+            />
             <span>多</span>
           </div>
         </div>
 
-        {/* 选中日期的当日完整思考回溯（展示批注 + 支持一键跳书） */}
-        {selectedDate && selectedDateAnnotations.length > 0 && (
+        {/* 选中日期的当日完整阅读与思考回溯（联动阅读时长 + 活跃书籍 + 划线批注） */}
+        {selectedDate &&
+          (selectedDateAnnotations.length > 0 ||
+            Boolean(selectedDayReading && selectedDayReading.readingTimeSec > 0) ||
+            selectedDayOpenedBooks.length > 0) && (
           <div
             data-testid="insights-daily-review"
             className="mt-5 pt-4 border-t border-paper-border dark:border-night-border space-y-3"
           >
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-paper-terracotta dark:text-night-terracotta">
-                📅 {selectedDate} 当日阅读回溯（{selectedDateAnnotations.length} 条）
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-paper-terracotta dark:text-night-terracotta">
+                  📅 {selectedDate} 当日阅读回溯
+                </span>
+                {selectedDayReading && selectedDayReading.readingTimeSec > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium">
+                    阅读 {formatReadingDuration(selectedDayReading.readingTimeSec)}
+                    {selectedDayReading.goalMet ? ' · 已达标' : ''}
+                  </span>
+                )}
+                <span className="text-paper-muted dark:text-night-muted">
+                  （{selectedDateAnnotations.length} 条划线）
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedDate(null)}
@@ -651,6 +969,29 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 收起
               </button>
             </div>
+
+            {selectedDayOpenedBooks.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="text-paper-muted dark:text-night-muted">当日在读书籍：</span>
+                {selectedDayOpenedBooks.map(b => (
+                  <button
+                    type="button"
+                    key={b.assetId}
+                    onClick={() => onSelectBook(b)}
+                    className="px-2.5 py-1 rounded-md bg-paper-drawer dark:bg-night-drawer hover:text-paper-terracotta dark:hover:text-night-terracotta text-paper-text dark:text-night-text font-serif transition-colors flex items-center gap-1"
+                  >
+                    <span>《{b.title}》</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedDateAnnotations.length === 0 ? (
+              <p className="text-xs text-paper-muted dark:text-night-muted py-3">
+                当日有 Apple Books 阅读记录，但未留下新的划线笔记。
+              </p>
+            ) : (
             <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
               {selectedDateAnnotations.map(a => {
                 const targetBook = bookMap.get(a.assetId);
@@ -718,6 +1059,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
         )}
       </div>

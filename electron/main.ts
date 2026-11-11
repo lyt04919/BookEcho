@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { SnapshotSyncer } from './services/snapshotSyncer';
+import { ReadingStatsSyncer } from './services/readingStatsSyncer';
 import { UserVaultDb } from './services/userVaultDb';
 import { EpubContextEngine } from './services/epubContextEngine';
 import { MarkdownExporter } from './services/markdownExporter';
@@ -9,6 +10,7 @@ import { AnnotationItem, HighlightColor } from './types/ipc';
 
 let mainWindow: BrowserWindow | null = null;
 let syncer: SnapshotSyncer;
+let readingStatsSyncer: ReadingStatsSyncer;
 let vault: UserVaultDb;
 let epubEngine: EpubContextEngine;
 
@@ -34,6 +36,7 @@ function initializeServices() {
     customBkDir: customDir ? path.join(customDir, 'BKLibrary') : undefined,
     customAeDir: customDir ? path.join(customDir, 'AEAnnotation') : undefined
   });
+  readingStatsSyncer = new ReadingStatsSyncer({ cacheDir });
 }
 
 function registerIpcHandlers() {
@@ -263,6 +266,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('review:submit', async (_, uuid: string, result: 'remembered' | 'mastered' | 'reset') => {
     vault.recordReviewResult(uuid, result);
+  });
+
+  ipcMain.handle('readingStats:get', async () => {
+    return readingStatsSyncer.extractReadingStats();
   });
 
   ipcMain.handle('semantics:get', async () => {

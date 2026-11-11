@@ -1,4 +1,4 @@
-import { BookItem, AnnotationItem } from '../../electron/types/ipc';
+import { BookItem, AnnotationItem, AppleBooksReadingStats } from '../../electron/types/ipc';
 
 export const DEMO_BOOKS: BookItem[] = [
   {
@@ -467,3 +467,40 @@ export const DEMO_ANNOTATIONS: AnnotationItem[] = [
     tags: ['商业思考', '决策', '认知']
   }
 ];
+
+function buildDemoReadingStats(): AppleBooksReadingStats {
+  const sampleMinutes = [25, 18, 42, 0, 35, 50, 15, 28, 32, 0, 45, 22, 38, 19];
+  const today = new Date();
+  const dailyHistory = sampleMinutes
+    .map((mins, idx) => {
+      const d = new Date(today.getTime() - (sampleMinutes.length - 1 - idx) * 86400000);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const sec = mins * 60;
+      return {
+        date: `${yyyy}-${mm}-${dd}`,
+        readingTimeSec: sec,
+        readingGoalSec: 1200,
+        goalMet: sec >= 1200
+      };
+    })
+    .filter(d => d.readingTimeSec > 0);
+
+  const totalReadingSec = dailyHistory.reduce((s, d) => s + d.readingTimeSec, 0);
+  const todayReadingSec = dailyHistory[dailyHistory.length - 1]?.readingTimeSec || 0;
+
+  return {
+    available: true,
+    todayReadingSec,
+    dailyGoalSec: 1200,
+    currentStreakDays: 4,
+    allTimeRecordStreakDays: 9,
+    currentYearBooksFinished: 6,
+    yearlyBooksFinishedGoal: 12,
+    totalReadingSec,
+    dailyHistory
+  };
+}
+
+export const DEMO_READING_STATS: AppleBooksReadingStats = buildDemoReadingStats();

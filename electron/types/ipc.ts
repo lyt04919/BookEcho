@@ -69,6 +69,25 @@ export interface ChapterContentResult {
   paragraphs: string[];
 }
 
+export interface DailyReadingStat {
+  date: string; // 'YYYY-MM-DD'
+  readingTimeSec: number;
+  readingGoalSec: number;
+  goalMet: boolean;
+}
+
+export interface AppleBooksReadingStats {
+  available: boolean;
+  todayReadingSec: number;
+  dailyGoalSec: number;
+  currentStreakDays: number;
+  allTimeRecordStreakDays: number;
+  currentYearBooksFinished: number;
+  yearlyBooksFinishedGoal: number;
+  totalReadingSec: number;
+  dailyHistory: DailyReadingStat[];
+}
+
 export interface BookEchoAPI {
   // 书架与高亮读取
   getBooks: () => Promise<BookItem[]>;
@@ -87,9 +106,10 @@ export interface BookEchoAPI {
   renameGlobalTag: (oldTag: string, newTag: string) => Promise<void>;
   deleteGlobalTag: (tag: string) => Promise<void>;
 
-  // 每日回顾
+  // 每日回顾与阅读统计
   getDailyReviewQueue: (limit?: number) => Promise<AnnotationItem[]>;
   submitReviewResult: (uuid: string, result: 'remembered' | 'mastered' | 'reset') => Promise<void>;
+  getReadingStats: () => Promise<AppleBooksReadingStats>;
 
   // 色彩配置与系统
   getColorSemantics: () => Promise<ColorSemanticConfig[]>;

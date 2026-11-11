@@ -23,6 +23,7 @@ const api: BookEchoAPI = {
   getDailyReviewQueue: (limit?: number) => ipcRenderer.invoke('review:getQueue', limit),
   submitReviewResult: (uuid: string, result: 'remembered' | 'mastered' | 'reset') =>
     ipcRenderer.invoke('review:submit', uuid, result),
+  getReadingStats: () => ipcRenderer.invoke('readingStats:get'),
 
   getColorSemantics: () => ipcRenderer.invoke('semantics:get'),
   updateColorSemantic: (colorKey: HighlightColor, label: string, hexColor?: string) =>

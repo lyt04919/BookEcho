@@ -216,6 +216,39 @@ describe('InsightsView Component', () => {
     expect(rhythm.chronotypeLabel).toContain('深夜沉浸型');
     expect(rhythm.hourlyCounts[23]).toBe(1);
   });
+
+  it('should render Apple Books daily reading duration card and heatmap toggle when readingStats is provided', () => {
+    const targetDate = toDateKey(mockAnnotations[0].creationDateMs);
+    const html = renderToStaticMarkup(
+      <InsightsView
+        books={mockBooks}
+        annotations={mockAnnotations}
+        colorSemantics={mockColorSemantics}
+        onSelectBook={vi.fn()}
+        defaultSelectedDate={targetDate}
+        readingStats={{
+          available: true,
+          todayReadingSec: 1500,
+          dailyGoalSec: 1200,
+          currentStreakDays: 3,
+          allTimeRecordStreakDays: 7,
+          currentYearBooksFinished: 4,
+          yearlyBooksFinishedGoal: 12,
+          totalReadingSec: 5400,
+          dailyHistory: [
+            { date: targetDate, readingTimeSec: 2640, readingGoalSec: 1200, goalMet: true }
+          ]
+        }}
+      />
+    );
+    expect(html).toContain('data-testid="insights-reading-duration"');
+    expect(html).toContain('Apple Books 每日阅读时长与目标');
+    expect(html).toContain('已达成目标');
+    expect(html).toContain('4 / 12');
+    expect(html).toContain('按划线笔记');
+    expect(html).toContain('按阅读时长');
+    expect(html).toContain('阅读 44 分钟');
+  });
 });
 
 describe('GlobalSearchView Component', () => {

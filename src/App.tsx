@@ -6,7 +6,8 @@ import {
   HighlightColor,
   HighlightContextResult,
   ChapterItem,
-  ChapterContentResult
+  ChapterContentResult,
+  AppleBooksReadingStats
 } from '../electron/types/ipc';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { BookshelfView } from './components/BookshelfView';
@@ -20,7 +21,7 @@ import { GlobalSearchView } from './components/GlobalSearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
 import { ColorSemanticsModal } from './components/ColorSemanticsModal';
 import { SettingsModal, SettingsTabId } from './components/SettingsModal';
-import { DEMO_BOOKS, DEMO_TAGS, DEMO_ANNOTATIONS } from './data/mockTestData';
+import { DEMO_BOOKS, DEMO_TAGS, DEMO_ANNOTATIONS, DEMO_READING_STATS } from './data/mockTestData';
 import { MessageSquareQuote, Download, Sparkles, X } from 'lucide-react';
 
 const DEFAULT_SEMANTICS: ColorSemanticConfig[] = [
@@ -83,6 +84,7 @@ export default function App() {
   ]);
   const [hiddenBookIds, setHiddenBookIds] = useState<string[]>([]);
   const [demoHiddenBookIds, setDemoHiddenBookIds] = useState<string[]>([]);
+  const [readingStats, setReadingStats] = useState<AppleBooksReadingStats | null>(null);
 
   // 活跃数据（支持在真实库与示例测试数据间平滑切换）
   const activeBooks = isDemoMode ? DEMO_BOOKS : books;
@@ -90,6 +92,7 @@ export default function App() {
   const activeAnnotations = isDemoMode ? demoAnnotations : allAnnotations;
   const activePinnedBookIds = isDemoMode ? demoPinnedBookIds : pinnedBookIds;
   const activeHiddenBookIds = isDemoMode ? demoHiddenBookIds : hiddenBookIds;
+  const activeReadingStats = isDemoMode ? DEMO_READING_STATS : readingStats;
 
   // 跳转到知识网络图谱并聚焦指定高亮节点
   const handleOpenInGraph = (annotation: AnnotationItem) => {
@@ -103,7 +106,7 @@ export default function App() {
   const loadInitialData = async () => {
     try {
       if (typeof window !== 'undefined' && window.bookEchoAPI) {
-        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw, customDirRaw, exportFmtRaw] = await Promise.all([
+        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw, customDirRaw, exportFmtRaw, fetchedReadingStats] = await Promise.all([
           window.bookEchoAPI.getBooks(),
           window.bookEchoAPI.getColorSemantics(),
           window.bookEchoAPI.getAllTags(),
@@ -111,7 +114,8 @@ export default function App() {
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('pinned_book_ids') : Promise.resolve(null),
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('hidden_book_ids') : Promise.resolve(null),
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('custom_apple_books_dir') : Promise.resolve(null),
-          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('export_format') : Promise.resolve(null)
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('export_format') : Promise.resolve(null),
+          window.bookEchoAPI.getReadingStats ? window.bookEchoAPI.getReadingStats().catch(() => null) : Promise.resolve(null)
         ]);
         setBooks(fetchedBooks || []);
         if (semantics && semantics.length > 0) {
@@ -125,6 +129,7 @@ export default function App() {
         if (exportFmtRaw === 'standard' || exportFmtRaw === 'obsidian') {
           setExportFormatPref(exportFmtRaw);
         }
+        if (fetchedReadingStats) setReadingStats(fetchedReadingStats);
         setTags(fetchedTags || []);
         setAllAnnotations(allAnnos || []);
         setHasPermissionError(false);
@@ -814,6 +819,7 @@ export default function App() {
             annotations={activeAnnotations}
             colorSemantics={colorSemantics}
             hiddenBookIds={activeHiddenBookIds}
+            readingStats={activeReadingStats}
             onSelectBook={handleSelectBook}
             onOpenColorSettings={handleOpenColorSettings}
             onOpenTagInGraph={tag => {
