@@ -6,16 +6,26 @@
   "appId": "com.bookecho.app",
   "productName": "BookEcho",
   "directories": {
-    "output": "release"
+    "output": "release",
+    "buildResources": "build"
   },
   "files": [
     "dist",
     "dist-electron"
   ],
+  "asarUnpack": [
+    "**/*.node"
+  ],
   "mac": {
     "icon": "build/icon.icns",
     "target": ["dmg", "zip"],
     "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "category": "public.app-category.productivity"
+    "category": "public.app-category.productivity",
+    "identity": "-",
+    "hardenedRuntime": false
+  },
+  "dmg": {
+    "title": "BookEcho ${version}",
+    "icon": "build/icon.icns"
   }
 }
