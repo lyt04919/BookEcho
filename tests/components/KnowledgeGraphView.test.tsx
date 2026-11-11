@@ -126,4 +126,32 @@ describe('KnowledgeGraphView Component', () => {
     expect(html).toContain('追求财富，而不是追求金钱或地位。');
     expect(html).toContain('反过来想，总是反过来想。');
   });
+
+  it('should render inline tag creation and management controls when tag callbacks are provided', () => {
+    const html = renderToStaticMarkup(
+      <KnowledgeGraphView
+        annotations={mockAnnotations}
+        books={mockBooks}
+        colorSemantics={mockColorSemantics}
+        availableTags={['心智模型', '财富', '未关联新标签']}
+        onSelectBook={vi.fn()}
+        onCreateTag={vi.fn()}
+        onRenameTag={vi.fn()}
+        onDeleteTag={vi.fn()}
+        onToggleStar={vi.fn()}
+        onUpdateCustomNote={vi.fn()}
+        onAddTag={vi.fn()}
+        onRemoveTag={vi.fn()}
+        onOpenQuoteModal={vi.fn()}
+        onRequestContext={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('新建标签...');
+    expect(html).toContain('新建');
+    expect(html).toContain('#未关联新标签');
+    expect(html).toContain('0条');
+    expect(html).toContain('重命名此标签');
+    expect(html).toContain('删除此标签');
+  });
 });

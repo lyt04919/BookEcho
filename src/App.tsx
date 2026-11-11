@@ -15,7 +15,6 @@ import { QuoteCardModal } from './components/QuoteCardModal';
 import { ExportModal } from './components/ExportModal';
 import { PermissionGuide } from './components/PermissionGuide';
 import { HighlightCard } from './components/HighlightCard';
-import { TagTopicView } from './components/TagTopicView';
 import { InsightsView } from './components/InsightsView';
 import { GlobalSearchView } from './components/GlobalSearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
@@ -55,11 +54,13 @@ export default function App() {
   const [isLoadingChapterContent, setIsLoadingChapterContent] = useState(false);
   const [selectedGraphNodeId, setSelectedGraphNodeId] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoTags, setDemoTags] = useState<string[]>(DEMO_TAGS);
+  const [demoAnnotations, setDemoAnnotations] = useState<AnnotationItem[]>(DEMO_ANNOTATIONS);
 
   // 活跃数据（支持在真实库与示例测试数据间平滑切换）
   const activeBooks = isDemoMode ? DEMO_BOOKS : books;
-  const activeTags = isDemoMode ? DEMO_TAGS : tags;
-  const activeAnnotations = isDemoMode ? DEMO_ANNOTATIONS : allAnnotations;
+  const activeTags = isDemoMode ? demoTags : tags;
+  const activeAnnotations = isDemoMode ? demoAnnotations : allAnnotations;
 
   // 跳转到知识网络图谱并聚焦指定高亮节点
   const handleOpenInGraph = (annotation: AnnotationItem) => {
@@ -146,7 +147,7 @@ export default function App() {
     setReadingChapterContent(null);
 
     if (isDemoMode) {
-      const annos = DEMO_ANNOTATIONS.filter(a => a.assetId === book.assetId);
+      const annos = demoAnnotations.filter(a => a.assetId === book.assetId);
       setCurrentAnnotations(annos);
       const chs = Array.from(new Set(annos.map(a => a.chapterTitle || '默认章节')));
       setBookChapters(
@@ -232,12 +233,18 @@ export default function App() {
   const handleToggleStar = async (uuid: string) => {
     const item =
       currentAnnotations.find(a => a.uuid === uuid) ||
-      allAnnotations.find(a => a.uuid === uuid);
+      activeAnnotations.find(a => a.uuid === uuid);
     if (!item) return;
     const nextStarred = !item.isStarred;
     setCurrentAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
+    if (isDemoMode) {
+      setDemoAnnotations(prev =>
+        prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
+      );
+      return;
+    }
     setAllAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, isStarred: nextStarred } : a))
     );
@@ -255,6 +262,12 @@ export default function App() {
     setCurrentAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
+    if (isDemoMode) {
+      setDemoAnnotations(prev =>
+        prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
+      );
+      return;
+    }
     setAllAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, customNote: note } : a))
     );
@@ -278,6 +291,19 @@ export default function App() {
         return a;
       })
     );
+    if (isDemoMode) {
+      setDemoAnnotations(prev =>
+        prev.map(a => {
+          if (a.uuid === uuid) {
+            const prevTags = a.tags || [];
+            return prevTags.includes(tag) ? a : { ...a, tags: [...prevTags, tag] };
+          }
+          return a;
+        })
+      );
+      setDemoTags(prev => (prev.includes(tag) ? prev : [...prev, tag]));
+      return;
+    }
     setAllAnnotations(prev =>
       prev.map(a => {
         if (a.uuid === uuid) {
@@ -303,6 +329,12 @@ export default function App() {
     setCurrentAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
+    if (isDemoMode) {
+      setDemoAnnotations(prev =>
+        prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
+      );
+      return;
+    }
     setAllAnnotations(prev =>
       prev.map(a => (a.uuid === uuid ? { ...a, tags: (a.tags || []).filter(t => t !== tag) } : a))
     );
@@ -321,6 +353,10 @@ export default function App() {
   const handleCreateGlobalTag = async (tag: string) => {
     const cleaned = tag.trim().replace(/^#+/, '');
     if (!cleaned) return;
+    if (isDemoMode) {
+      setDemoTags(prev => (prev.includes(cleaned) ? prev : [...prev, cleaned]));
+      return;
+    }
     setTags(prev => (prev.includes(cleaned) ? prev : [...prev, cleaned]));
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -338,14 +374,7 @@ export default function App() {
     const cleanNew = newTag.trim().replace(/^#+/, '');
     if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
 
-    setTags(prev => Array.from(new Set(prev.map(t => (t === cleanOld ? cleanNew : t)))));
     setCurrentAnnotations(prev =>
-      prev.map(a => ({
-        ...a,
-        tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
-      }))
-    );
-    setAllAnnotations(prev =>
       prev.map(a => ({
         ...a,
         tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
@@ -354,6 +383,25 @@ export default function App() {
     if (selectedTag === cleanOld) {
       setSelectedTag(cleanNew);
     }
+
+    if (isDemoMode) {
+      setDemoTags(prev => Array.from(new Set(prev.map(t => (t === cleanOld ? cleanNew : t)))));
+      setDemoAnnotations(prev =>
+        prev.map(a => ({
+          ...a,
+          tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
+        }))
+      );
+      return;
+    }
+
+    setTags(prev => Array.from(new Set(prev.map(t => (t === cleanOld ? cleanNew : t)))));
+    setAllAnnotations(prev =>
+      prev.map(a => ({
+        ...a,
+        tags: Array.from(new Set((a.tags || []).map(t => (t === cleanOld ? cleanNew : t))))
+      }))
+    );
 
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -370,16 +418,25 @@ export default function App() {
     const clean = tag.trim().replace(/^#+/, '');
     if (!clean) return;
 
-    setTags(prev => prev.filter(t => t !== clean));
     setCurrentAnnotations(prev =>
-      prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
-    );
-    setAllAnnotations(prev =>
       prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
     );
     if (selectedTag === clean) {
       setSelectedTag(null);
     }
+
+    if (isDemoMode) {
+      setDemoTags(prev => prev.filter(t => t !== clean));
+      setDemoAnnotations(prev =>
+        prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
+      );
+      return;
+    }
+
+    setTags(prev => prev.filter(t => t !== clean));
+    setAllAnnotations(prev =>
+      prev.map(a => ({ ...a, tags: (a.tags || []).filter(t => t !== clean) }))
+    );
 
     if (typeof window !== 'undefined' && window.bookEchoAPI) {
       try {
@@ -534,33 +591,7 @@ export default function App() {
             }}
             onRetry={loadInitialData}
           />
-        ) : currentTab === 'tags' || selectedTag ? (
-          <TagTopicView
-            tag={selectedTag}
-            tags={activeTags}
-            annotations={activeAnnotations}
-            books={activeBooks}
-            colorSemantics={colorSemantics}
-            onSelectTag={setSelectedTag}
-            onCreateGlobalTag={handleCreateGlobalTag}
-            onRenameGlobalTag={handleRenameGlobalTag}
-            onDeleteGlobalTag={handleDeleteGlobalTag}
-            onClearTag={() => setSelectedTag(null)}
-            onSelectBook={handleSelectBook}
-            onToggleStar={handleToggleStar}
-            onUpdateCustomNote={handleUpdateCustomNote}
-            onAddTag={handleAddTag}
-            onRemoveTag={handleRemoveTag}
-            onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
-            onRequestContext={handleRequestContext}
-            onOpenInGraph={handleOpenInGraph}
-            onSwitchToGraph={() => {
-              setSelectedBook(null);
-              setSelectedTag(null);
-              setCurrentTab('graph');
-            }}
-          />
-        ) : currentTab === 'graph' ? (
+        ) : currentTab === 'graph' || currentTab === 'tags' || Boolean(selectedTag) ? (
           <KnowledgeGraphView
             annotations={activeAnnotations}
             books={activeBooks}
@@ -569,15 +600,18 @@ export default function App() {
             onSelectBook={handleSelectBook}
             onManageTags={() => {
               setSelectedBook(null);
-              setCurrentTab('tags');
+              setCurrentTab('graph');
             }}
+            onCreateTag={handleCreateGlobalTag}
+            onRenameTag={handleRenameGlobalTag}
+            onDeleteTag={handleDeleteGlobalTag}
             onToggleStar={handleToggleStar}
             onUpdateCustomNote={handleUpdateCustomNote}
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
             onOpenQuoteModal={anno => setActiveQuoteItem(anno)}
             onRequestContext={handleRequestContext}
-            initialFocusedNodeId={selectedGraphNodeId}
+            initialFocusedNodeId={selectedGraphNodeId || (selectedTag ? `tag:${selectedTag}` : null)}
             isDarkMode={isDarkMode}
           />
         ) : currentTab === 'insights' ? (
@@ -599,7 +633,7 @@ export default function App() {
             onSelectBook={handleSelectBook}
             onManageTags={() => {
               setSelectedBook(null);
-              setCurrentTab('tags');
+              setCurrentTab('graph');
             }}
             onToggleStar={handleToggleStar}
             onUpdateCustomNote={handleUpdateCustomNote}
@@ -670,7 +704,7 @@ export default function App() {
                       onOpenInGraph={handleOpenInGraph}
                       onManageTags={() => {
                         setSelectedBook(null);
-                        setCurrentTab('tags');
+                        setCurrentTab('graph');
                       }}
                       onToggleStar={handleToggleStar}
                       onUpdateCustomNote={handleUpdateCustomNote}
@@ -694,7 +728,7 @@ export default function App() {
             onOpenInGraph={handleOpenInGraph}
             onManageTags={() => {
               setSelectedBook(null);
-              setCurrentTab('tags');
+              setCurrentTab('graph');
             }}
             onBack={() => {
               setSelectedBook(null);
@@ -722,7 +756,7 @@ export default function App() {
             onCloseChapterReader={() => setReadingChapterContent(null)}
           />
         ) : (
-          <BookshelfView books={books} onSelectBook={handleSelectBook} />
+          <BookshelfView books={activeBooks} onSelectBook={handleSelectBook} />
         )}
       </main>
 
@@ -733,12 +767,12 @@ export default function App() {
           bookTitle={
             activeQuoteItem.bookTitle ||
             selectedBook?.title ||
-            books.find(b => b.assetId === activeQuoteItem.assetId)?.title ||
+            activeBooks.find(b => b.assetId === activeQuoteItem.assetId)?.title ||
             '未知书籍'
           }
           author={
             selectedBook?.author ||
-            books.find(b => b.assetId === activeQuoteItem.assetId)?.author ||
+            activeBooks.find(b => b.assetId === activeQuoteItem.assetId)?.author ||
             '未知作者'
           }
           onClose={() => setActiveQuoteItem(null)}

@@ -2,7 +2,6 @@ import React from 'react';
 import {
   BookOpen,
   Search,
-  Tag,
   FolderOpen,
   Sun,
   Moon,
@@ -140,45 +139,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={() => onSelectTab('graph')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                currentTab === 'graph' && !selectedTag
-                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-              }`}
-            >
-              <Waypoints className="w-4 h-4 text-amber-500" />
-              <span>知识网络</span>
-            </button>
-
-            <button
-              onClick={() => onSelectTab('insights')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                currentTab === 'insights' && !selectedTag
-                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
-                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>阅读足迹</span>
-            </button>
-
-            <button
-              onClick={() => onSelectTab('tags')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                currentTab === 'tags' || Boolean(selectedTag)
+                currentTab === 'graph' || currentTab === 'tags' || Boolean(selectedTag)
                   ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
                   : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
               }`}
             >
               <span className="flex items-center gap-2.5">
-                <Tag className="w-4 h-4 text-rose-500" />
-                <span>标签管理</span>
+                <Waypoints className="w-4 h-4 text-amber-500" />
+                <span>知识网络</span>
               </span>
               {tags.length > 0 && (
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted font-mono">
                   {tags.length}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => onSelectTab('insights')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                currentTab === 'insights'
+                  ? 'bg-white dark:bg-night-card shadow-sm font-medium text-paper-text dark:text-night-text'
+                  : 'text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>阅读足迹</span>
             </button>
           </nav>
         )}

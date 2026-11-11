@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BookItem,
   AnnotationItem,
@@ -20,7 +20,10 @@ import {
   LayoutGrid,
   Columns,
   Library,
-  Share2
+  Share2,
+  Plus,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 
 export type ResonanceViewMode = 'topic-clusters' | 'global-stream' | 'book-clusters';
@@ -31,7 +34,10 @@ export interface KnowledgeGraphViewProps {
   colorSemantics: ColorSemanticConfig[];
   availableTags: string[];
   onSelectBook: (book: BookItem) => void;
-  onManageTags: () => void;
+  onManageTags?: () => void;
+  onCreateTag?: (tag: string) => void;
+  onRenameTag?: (oldTag: string, newTag: string) => void;
+  onDeleteTag?: (tag: string) => void;
   onToggleStar: (uuid: string) => void;
   onUpdateCustomNote: (uuid: string, note: string) => void;
   onAddTag: (uuid: string, tag: string) => void;
@@ -49,6 +55,9 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   availableTags,
   onSelectBook,
   onManageTags,
+  onCreateTag,
+  onRenameTag,
+  onDeleteTag,
   onToggleStar,
   onUpdateCustomNote,
   onAddTag,
@@ -68,6 +77,53 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(initialFocusedNodeId);
   const [isCopiedGlobal, setIsCopiedGlobal] = useState(false);
   const [copiedTopicTag, setCopiedTopicTag] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFocusedNodeId(initialFocusedNodeId);
+  }, [initialFocusedNodeId]);
+
+  // 标签管理内部状态
+  const [newTagName, setNewTagName] = useState('');
+  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+
+  const handleCreateTag = () => {
+    const cleaned = newTagName.trim().replace(/^#+/, '');
+    if (!cleaned) return;
+    onCreateTag?.(cleaned);
+    setNewTagName('');
+  };
+
+  const handleStartRename = (tag: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingTag(tag);
+    setEditingValue(tag);
+  };
+
+  const handleConfirmRename = (oldTag: string) => {
+    const cleaned = editingValue.trim().replace(/^#+/, '');
+    if (cleaned && cleaned !== oldTag) {
+      onRenameTag?.(oldTag, cleaned);
+      if (selectedTagFilter === oldTag) {
+        setSelectedTagFilter(cleaned);
+      }
+    }
+    setEditingTag(null);
+    setEditingValue('');
+  };
+
+  const handleDeleteTag = (tag: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (!window.confirm(`确定要删除标签 #${tag} 吗？\n删除后各书籍中的相关划线不会被删除。`)) {
+        return;
+      }
+    }
+    onDeleteTag?.(tag);
+    if (selectedTagFilter === tag) {
+      setSelectedTagFilter('all');
+    }
+  };
 
   // 基础映射
   const bookMap = useMemo(() => new Map(books.map(b => [b.assetId, b])), [books]);
@@ -122,10 +178,10 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     return map;
   }, [annotations]);
 
-  // 有效标签列表（按连接思考数量倒序）
+  // 有效标签列表（包含所有已有及新建的标签，按连接思考数量倒序）
   const activeTags = useMemo(() => {
     return availableTags
-      .filter(t => (tagStats.get(t)?.count || 0) > 0)
+      .slice()
       .sort((a, b) => (tagStats.get(b)?.count || 0) - (tagStats.get(a)?.count || 0));
   }, [availableTags, tagStats]);
 
@@ -380,64 +436,142 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
         </div>
       </header>
 
-      {/* 2. 标签引力胶囊条（Tag Resonance Pills Bar） */}
-      {activeTags.length > 0 ? (
-        <div className="flex-shrink-0 px-4 py-2.5 bg-paper-sidebar/50 dark:bg-night-sidebar/50 border-b border-paper-border/60 dark:border-night-border/60 overflow-x-auto flex items-center gap-2 no-scrollbar">
-          <span className="text-[11px] font-medium text-paper-muted dark:text-night-muted flex items-center gap-1 flex-shrink-0">
-            <Tag className="w-3 h-3 text-paper-terracotta" />
-            <span>思想引力场：</span>
+      {/* 2. 标签引力胶囊与全局管理条 */}
+      <div className="flex-shrink-0 px-4 py-2.5 bg-paper-sidebar/50 dark:bg-night-sidebar/50 border-b border-paper-border/60 dark:border-night-border/60 flex flex-wrap items-center justify-between gap-3">
+        {/* 左侧：标签胶囊流 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-medium text-paper-muted dark:text-night-muted flex items-center gap-1 flex-shrink-0 mr-0.5">
+            <Tag className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+            <span>思想引力场 ({activeTags.length})：</span>
           </span>
 
-          {activeTags.map(t => {
-            const stat = tagStats.get(t);
-            const isHovered = hoveredTag === t;
-            const isSelected = selectedTagFilter === t;
-
-            return (
-              <button
-                key={t}
-                onMouseEnter={() => setHoveredTag(t)}
-                onMouseLeave={() => setHoveredTag(null)}
-                onClick={() => setSelectedTagFilter(prev => (prev === t ? 'all' : t))}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all ${
-                  isSelected
-                    ? 'bg-paper-terracotta text-white font-medium shadow-xs scale-105'
-                    : isHovered
-                    ? 'bg-paper-terracotta/20 text-paper-terracotta dark:text-night-terracotta ring-1 ring-paper-terracotta font-medium'
-                    : 'bg-white/80 dark:bg-night-card/80 border border-paper-border dark:border-night-border text-paper-text/80 dark:text-night-text/80 hover:border-paper-terracotta/50'
-                }`}
-              >
-                <span>#{t}</span>
-                <span className="text-[10px] opacity-75 font-mono">
-                  {stat?.bookIds.size}书·{stat?.count}条
-                </span>
-              </button>
-            );
-          })}
-
-          <button
-            onClick={onManageTags}
-            className="flex-shrink-0 text-xs text-paper-terracotta dark:text-night-terracotta hover:underline ml-1"
-          >
-            + 管理标签
-          </button>
-        </div>
-      ) : (
-        <div className="flex-shrink-0 px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span>
-              当前书库划线尚未打上标签，下方正按【书籍分组】聚合呈现。给不同书籍的划线打上相同标签即可在此产生思想共鸣！
+          {activeTags.length === 0 ? (
+            <span className="text-xs text-paper-muted italic">
+              暂无标签，在右侧输入框创建你的第一个主题标签 →
             </span>
-          </div>
-          <button
-            onClick={onManageTags}
-            className="font-medium underline hover:text-amber-800 dark:hover:text-amber-200"
-          >
-            前往标签管理
-          </button>
+          ) : (
+            activeTags.map(t => {
+              const stat = tagStats.get(t);
+              const isHovered = hoveredTag === t;
+              const isSelected = selectedTagFilter === t;
+              const isEditing = editingTag === t;
+
+              if (isEditing) {
+                return (
+                  <div
+                    key={t}
+                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-paper-terracotta bg-paper-card dark:bg-night-card shadow-xs text-xs"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <span className="text-paper-terracotta font-mono text-xs">#</span>
+                    <input
+                      type="text"
+                      value={editingValue}
+                      onChange={e => setEditingValue(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleConfirmRename(t);
+                        if (e.key === 'Escape') setEditingTag(null);
+                      }}
+                      className="w-20 px-1 py-0.5 text-xs bg-transparent text-paper-text dark:text-night-text focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleConfirmRename(t)}
+                      className="p-0.5 hover:text-emerald-600 text-paper-muted"
+                      title="保存重命名"
+                    >
+                      <Check className="w-3 h-3 text-emerald-500" />
+                    </button>
+                    <button
+                      onClick={() => setEditingTag(null)}
+                      className="p-0.5 hover:text-rose-500 text-paper-muted"
+                      title="取消"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={t}
+                  onMouseEnter={() => setHoveredTag(t)}
+                  onMouseLeave={() => setHoveredTag(null)}
+                  className={`group flex-shrink-0 flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-full text-xs transition-all cursor-pointer select-none ${
+                    isSelected
+                      ? 'bg-paper-terracotta text-white font-medium shadow-xs scale-105'
+                      : isHovered
+                      ? 'bg-paper-terracotta/20 text-paper-terracotta dark:text-night-terracotta ring-1 ring-paper-terracotta font-medium'
+                      : 'bg-white/80 dark:bg-night-card/80 border border-paper-border dark:border-night-border text-paper-text/80 dark:text-night-text/80 hover:border-paper-terracotta/50'
+                  }`}
+                  onClick={() => setSelectedTagFilter(prev => (prev === t ? 'all' : t))}
+                >
+                  <span>#{t}</span>
+                  <span className="text-[10px] opacity-75 font-mono">
+                    {stat ? `${stat.bookIds.size}书·${stat.count}条` : '0条'}
+                  </span>
+
+                  {/* 悬停微型管理按钮（重命名、删除） */}
+                  {(onRenameTag || onDeleteTag) && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-0.5">
+                      {onRenameTag && (
+                        <button
+                          onClick={e => handleStartRename(t, e)}
+                          className={`p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 ${
+                            isSelected ? 'text-white' : 'text-paper-muted hover:text-paper-text'
+                          }`}
+                          title="重命名标签"
+                        >
+                          <Edit2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                      {onDeleteTag && (
+                        <button
+                          onClick={e => handleDeleteTag(t, e)}
+                          className={`p-0.5 rounded hover:bg-rose-500/20 ${
+                            isSelected ? 'text-white hover:text-rose-200' : 'text-paper-muted hover:text-rose-500'
+                          }`}
+                          title="删除标签"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
-      )}
+
+        {/* 右侧：新建标签一体化输入组件 */}
+        {onCreateTag && (
+          <div className="flex items-center rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card shadow-2xs p-1 focus-within:ring-1 focus-within:ring-paper-terracotta dark:focus-within:ring-night-terracotta focus-within:border-paper-terracotta transition-all flex-shrink-0 ml-auto">
+            <div className="flex items-center pl-2 pr-1">
+              <span className="text-paper-muted dark:text-night-muted text-xs font-mono select-none">#</span>
+              <input
+                type="text"
+                value={newTagName}
+                onChange={e => setNewTagName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreateTag();
+                }}
+                placeholder="新建标签..."
+                className="pl-1 pr-2 py-1 text-xs bg-transparent text-paper-text dark:text-night-text placeholder:text-paper-muted/70 focus:outline-none w-24 sm:w-32 transition-all"
+              />
+            </div>
+            <button
+              onClick={handleCreateTag}
+              disabled={!newTagName.trim()}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-2xs hover:opacity-95 active:scale-95 disabled:opacity-40 disabled:hover:opacity-40 transition-all flex-shrink-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>新建</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* 3. 思想共鸣卡片流主体展区 */}
       <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8">
@@ -503,18 +637,42 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                         </p>
                       </div>
 
-                      <button
-                        onClick={() => handleCopyClusterMarkdown(tag)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-paper-border dark:border-night-border hover:border-paper-terracotta text-paper-muted hover:text-paper-text bg-paper-card dark:bg-night-card transition-colors"
-                        title="复制本主题所有跨书笔记为 Markdown"
-                      >
-                        {copiedTopicTag === tag ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {onRenameTag && (
+                          <button
+                            onClick={() => handleStartRename(tag)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-paper-border dark:border-night-border hover:border-paper-terracotta text-paper-muted hover:text-paper-text bg-paper-card dark:bg-night-card transition-colors shadow-2xs"
+                            title="重命名此标签"
+                          >
+                            <Edit2 className="w-3 h-3 text-paper-muted" />
+                            <span className="hidden sm:inline">重命名</span>
+                          </button>
                         )}
-                        <span>{copiedTopicTag === tag ? '已复制' : '复制本主题'}</span>
-                      </button>
+
+                        {onDeleteTag && (
+                          <button
+                            onClick={() => handleDeleteTag(tag)}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-paper-border dark:border-night-border hover:border-rose-400 text-paper-muted hover:text-rose-500 bg-paper-card dark:bg-night-card transition-colors shadow-2xs"
+                            title="删除此标签"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span className="hidden sm:inline">删除</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleCopyClusterMarkdown(tag)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-paper-border dark:border-night-border hover:border-paper-terracotta text-paper-muted hover:text-paper-text bg-paper-card dark:bg-night-card transition-colors shadow-2xs"
+                          title="复制本主题所有跨书笔记为 Markdown"
+                        >
+                          {copiedTopicTag === tag ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          <span>{copiedTopicTag === tag ? '已复制' : '复制本主题'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* 卡片网格 */}

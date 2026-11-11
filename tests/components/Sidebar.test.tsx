@@ -110,15 +110,16 @@ describe('Sidebar Component', () => {
     expect(html).not.toContain('第二章 判断力');
   });
 
-  it('should render tag manager nav item with count badge when tags array is non-empty', () => {
+  it('should render knowledge network nav item with count badge when tags array is non-empty', () => {
     const html = renderToStaticMarkup(<Sidebar {...defaultProps} tags={['心智模型', '经济学']} />);
-    expect(html).toContain('标签管理');
+    expect(html).toContain('知识网络');
     expect(html).toContain('>2<');
   });
 
   it('should not render tag count badge when tags array is empty', () => {
     const html = renderToStaticMarkup(<Sidebar {...defaultProps} tags={[]} />);
-    expect(html).toContain('标签管理');
+    expect(html).toContain('知识网络');
+    expect(html).not.toContain('标签管理');
     expect(html).not.toContain('#心智模型');
   });
 
