@@ -1,7 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TagTopicView, formatTagTopicMarkdown } from '../../src/components/TagTopicView';
-import { InsightsView } from '../../src/components/InsightsView';
+import {
+  InsightsView,
+  resolveAnnotationTimestamp,
+  toDateKey,
+  buildCalendarWeeks,
+  calculateStreaks,
+  computeReadingRhythm
+} from '../../src/components/InsightsView';
 import { GlobalSearchView } from '../../src/components/GlobalSearchView';
 import { BookItem, AnnotationItem, ColorSemanticConfig } from '../../electron/types/ipc';
 
@@ -137,6 +144,77 @@ describe('InsightsView Component', () => {
     expect(html).toContain('高亮色彩语义分布');
     expect(html).toContain('核心论点');
     expect(html).toContain('概念与背景');
+    expect(html).toContain('深度思考率 100%');
+    expect(html).toContain('24 小时阅读生物钟');
+    expect(html).toContain('每周阅读节律分布');
+    expect(html).toContain('高频思考主题标签');
+    expect(html).toContain('#心智模型');
+    expect(html).toContain('常读知识领域分布');
+    expect(html).toContain('商业');
+  });
+
+  it('should render daily review card with notes, customNote and semantic label when a date is selected', () => {
+    const targetDate = toDateKey(mockAnnotations[0].creationDateMs);
+    const html = renderToStaticMarkup(
+      <InsightsView
+        books={mockBooks}
+        annotations={mockAnnotations}
+        colorSemantics={mockColorSemantics}
+        onSelectBook={vi.fn()}
+        defaultSelectedDate={targetDate}
+      />
+    );
+    expect(html).toContain('data-testid="insights-daily-review"');
+    expect(html).toContain('《纳瓦尔宝典》');
+    expect(html).toContain('追求财富，而不是追求金钱或地位。');
+    expect(html).toContain('复利资产的本质');
+    expect(html).toContain('睡后收入资产');
+    expect(html).toContain('核心论点');
+  });
+
+  it('should exclude hidden books from visible bookshelf stats when hiddenBookIds is provided', () => {
+    const html = renderToStaticMarkup(
+      <InsightsView
+        books={mockBooks}
+        annotations={mockAnnotations}
+        colorSemantics={mockColorSemantics}
+        hiddenBookIds={['book-2']}
+        onSelectBook={vi.fn()}
+      />
+    );
+    expect(html).toContain('已排除隐藏 1 本');
+    expect(html).toContain('1. 纳瓦尔宝典');
+    expect(html).not.toContain('2. 穷查理宝典');
+  });
+
+  it('should compute accurate calendar weeks, streaks, timestamps and reading rhythm', () => {
+    // 1. Prefer creationDateMs over modificationDateMs
+    const anno: AnnotationItem = {
+      ...mockAnnotations[0],
+      creationDateMs: 1700000000000,
+      modificationDateMs: 1750000000000
+    };
+    expect(resolveAnnotationTimestamp(anno)).toBe(1700000000000);
+
+    // 2. Calendar matrix has full 7-day weeks
+    const { weeks, monthLabels } = buildCalendarWeeks({ '2026-03-15': 3 }, '2026', new Date(2026, 5, 1));
+    expect(weeks.length).toBeGreaterThanOrEqual(52);
+    expect(weeks.every(w => w.length === 7)).toBe(true);
+    expect(monthLabels.length).toBe(12);
+
+    // 3. Streaks calculation
+    const streaks = calculateStreaks(['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-05']);
+    expect(streaks.activeDays).toBe(4);
+    expect(streaks.longestStreak).toBe(3);
+
+    // 4. Reading rhythm
+    const nightDate = new Date(2026, 4, 10, 23, 15, 0).getTime();
+    const rhythm = computeReadingRhythm([
+      { ...mockAnnotations[0], creationDateMs: nightDate, modificationDateMs: nightDate }
+    ]);
+    expect(rhythm.peakHour).toBe(23);
+    expect(rhythm.chronotypeLabel).toContain('深夜沉浸型');
+    expect(rhythm.hourlyCounts[23]).toBe(1);
   });
 });
 

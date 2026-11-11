@@ -813,8 +813,15 @@ export default function App() {
             books={activeBooks}
             annotations={activeAnnotations}
             colorSemantics={colorSemantics}
+            hiddenBookIds={activeHiddenBookIds}
             onSelectBook={handleSelectBook}
             onOpenColorSettings={handleOpenColorSettings}
+            onOpenTagInGraph={tag => {
+              setSelectedBook(null);
+              setSelectedTag(null);
+              setSelectedGraphNodeId(`tag:${tag}`);
+              setCurrentTab('graph');
+            }}
           />
         ) : currentTab === 'search' ? (
           <GlobalSearchView
