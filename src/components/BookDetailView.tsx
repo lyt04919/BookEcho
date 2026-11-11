@@ -17,7 +17,8 @@ import {
   Search,
   X,
   BookOpen,
-  Palette
+  Palette,
+  Bookmark
 } from 'lucide-react';
 
 export interface BookDetailViewProps {
@@ -46,6 +47,8 @@ export interface BookDetailViewProps {
   onOpenColorSettings?: () => void;
   onUpdateChapter?: (uuid: string, chapterTitle: string) => void;
   chapterSuggestions?: string[];
+  isPinned?: boolean;
+  onTogglePinBook?: (assetId: string) => void;
 }
 
 export const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -72,7 +75,9 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
   onOpenInGraph,
   onOpenColorSettings,
   onUpdateChapter,
-  chapterSuggestions = []
+  chapterSuggestions = [],
+  isPinned = false,
+  onTogglePinBook
 }) => {
   // 单书内专属筛选状态
   const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
@@ -173,6 +178,21 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
         </button>
 
         <div className="flex items-center gap-3">
+          {onTogglePinBook && (
+            <button
+              onClick={() => onTogglePinBook(book.assetId)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors shadow-sm ${
+                isPinned
+                  ? 'border-paper-terracotta/50 bg-paper-terracotta/10 text-paper-terracotta dark:text-night-terracotta font-medium'
+                  : 'border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta'
+              }`}
+              title={isPinned ? '点击移出左侧重点笔记书单' : '点击加入左侧重点笔记书单'}
+            >
+              <Bookmark className="w-3.5 h-3.5" fill={isPinned ? 'currentColor' : 'none'} />
+              <span>{isPinned ? '已在重点书单' : '加入重点书单'}</span>
+            </button>
+          )}
+
           <button
             onClick={() => onOpenInAppleBooks(book.assetId, book.epubPath)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-xs text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text shadow-sm transition-colors"

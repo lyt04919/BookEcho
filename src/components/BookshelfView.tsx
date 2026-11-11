@@ -19,6 +19,8 @@ export interface BookshelfViewProps {
   books: BookItem[];
   onSelectBook: (book: BookItem) => void;
   defaultSortBy?: 'recent' | 'highlights' | 'title';
+  pinnedBookIds?: string[];
+  onTogglePinBook?: (assetId: string) => void;
   selectedColor?: HighlightColor | null;
   selectedTag?: string | null;
   colorSemantics?: ColorSemanticConfig[];
@@ -36,17 +38,26 @@ export interface BookshelfViewProps {
 export const BookshelfView: React.FC<BookshelfViewProps> = ({
   books,
   onSelectBook,
-  defaultSortBy = 'recent'
+  defaultSortBy = 'recent',
+  pinnedBookIds = [],
+  onTogglePinBook
 }) => {
   const [sortBy, setSortBy] = useState<'recent' | 'highlights' | 'title'>(defaultSortBy);
-  const [filterMode, setFilterMode] = useState<'all' | 'has_notes'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'has_notes' | 'pinned'>('all');
 
-  // 计算有笔记的书籍列表与总高亮数
+  // 计算有笔记的书籍、重点书单与总高亮数
+  const pinnedSet = new Set(pinnedBookIds);
+  const pinnedBooks = books.filter(b => pinnedSet.has(b.assetId));
   const booksWithNotes = books.filter(b => (b.highlightsCount || 0) > 0);
   const totalHighlights = books.reduce((acc, b) => acc + (b.highlightsCount || 0), 0);
 
   // 根据当前过滤器获取目标书籍
-  const displayBooks = filterMode === 'has_notes' ? booksWithNotes : books;
+  const displayBooks =
+    filterMode === 'has_notes'
+      ? booksWithNotes
+      : filterMode === 'pinned'
+      ? pinnedBooks
+      : books;
 
   // 排序
   const sortedBooks = [...displayBooks].sort((a, b) => {
@@ -58,6 +69,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
   });
 
   const renderBookCard = (book: BookItem) => {
+    const isPinned = pinnedSet.has(book.assetId);
     const progressPercent =
       typeof book.readingProgress === 'number' && book.readingProgress > 0
         ? Math.min(100, Math.round(book.readingProgress <= 1 ? book.readingProgress * 100 : book.readingProgress))
@@ -81,6 +93,26 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
                 {book.title}
               </span>
             </div>
+          )}
+
+          {/* 右上角：加入/移出重点书单书签按钮 */}
+          {onTogglePinBook && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                onTogglePinBook(book.assetId);
+              }}
+              className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-sm transition-all ${
+                isPinned
+                  ? 'bg-paper-terracotta dark:bg-night-terracotta text-white shadow-sm opacity-100'
+                  : 'bg-black/45 text-white/85 opacity-0 group-hover:opacity-100 hover:bg-paper-terracotta hover:text-white'
+              }`}
+              title={isPinned ? '从重点书单移出' : '加入重点书单'}
+              aria-label={isPinned ? `从重点书单移出 ${book.title}` : `将 ${book.title} 加入重点书单`}
+            >
+              <Bookmark className="w-3.5 h-3.5" fill={isPinned ? 'currentColor' : 'none'} />
+            </button>
           )}
 
           {/* 划线数量标签 */}
@@ -159,9 +191,23 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
                     : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                 }`}
               >
-                <Bookmark className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+                <Highlighter className="w-3.5 h-3.5 text-amber-500" />
                 <span>有笔记的书 ({booksWithNotes.length})</span>
               </button>
+              {onTogglePinBook && (
+                <button
+                  data-testid="filter-pinned-books"
+                  onClick={() => setFilterMode('pinned')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                    filterMode === 'pinned'
+                      ? 'bg-white dark:bg-night-card font-medium text-paper-text dark:text-night-text shadow-xs'
+                      : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
+                  }`}
+                >
+                  <Bookmark className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+                  <span>重点书单 ({pinnedBooks.length})</span>
+                </button>
+              )}
             </div>
           </div>
           <p className="text-sm text-paper-muted dark:text-night-muted mt-1.5">

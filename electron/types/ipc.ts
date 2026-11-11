@@ -94,6 +94,8 @@ export interface BookEchoAPI {
   // 色彩配置与系统
   getColorSemantics: () => Promise<ColorSemanticConfig[]>;
   updateColorSemantic: (colorKey: HighlightColor, label: string, hexColor?: string) => Promise<void>;
+  getSetting: (key: string) => Promise<string | null>;
+  setSetting: (key: string, value: string) => Promise<void>;
   openInAppleBooks: (assetId: string, epubPath?: string | null) => Promise<boolean>;
   openSystemPrivacySettings: () => Promise<boolean>;
   selectCustomDataDir: () => Promise<string | null>;

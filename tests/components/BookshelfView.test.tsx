@@ -214,6 +214,20 @@ describe('BookshelfView Component', () => {
     expect(html).toContain('全部藏书 (3)');
     expect(html).toContain('有笔记的书 (3)');
   });
+
+  it('should render pinned books filter tab and per-card bookmark pin toggles', () => {
+    const html = renderToStaticMarkup(
+      <BookshelfView
+        {...defaultProps}
+        pinnedBookIds={['asset-book-b']}
+        onTogglePinBook={vi.fn()}
+      />
+    );
+    expect(html).toContain('data-testid="filter-pinned-books"');
+    expect(html).toContain('重点书单 (1)');
+    expect(html).toContain('从重点书单移出 B - 思考快与慢');
+    expect(html).toContain('将 A - 原则 加入重点书单');
+  });
 });
 
 describe('App Integration with BookshelfView', () => {

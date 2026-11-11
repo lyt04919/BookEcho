@@ -13,7 +13,9 @@ import {
   ArrowLeft,
   Waypoints,
   Sparkles,
-  Palette
+  Palette,
+  X,
+  Plus
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
@@ -32,6 +34,9 @@ export interface SidebarProps {
   onToggleDarkMode: () => void;
   onSelectCustomDir: () => void;
   books?: BookItem[];
+  pinnedBookIds?: string[];
+  onTogglePinBook?: (assetId: string) => void;
+  onBatchPinBooks?: (assetIds: string[]) => void;
   selectedBook?: BookItem | null;
   onSelectBook?: (book: BookItem) => void;
   chapters?: (string | { title: string; notesCount: number })[];
@@ -55,6 +60,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDarkMode,
   onSelectCustomDir,
   books = [],
+  pinnedBookIds = [],
+  onTogglePinBook,
+  onBatchPinBooks,
   selectedBook = null,
   onSelectBook,
   chapters = [],
@@ -68,7 +76,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleDemoMode,
   onOpenColorSettings
 }) => {
-  // 重点笔记书籍（划线数大于0的书籍，按笔记数倒序）
+  // 用户手动标记的重点书单（支持在书架、书页及侧边栏增删）
+  const pinnedSet = new Set(pinnedBookIds);
+  const pinnedBooks = books
+    .filter(b => pinnedSet.has(b.assetId))
+    .sort((a, b) => (b.highlightsCount || 0) - (a.highlightsCount || 0));
+
+  // 有笔记的书籍（仅用于引导快捷导入，不擅自替用户设为重点）
   const booksWithNotes = books
     .filter(b => (b.highlightsCount || 0) > 0)
     .sort((a, b) => b.highlightsCount - a.highlightsCount)
@@ -223,29 +237,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
               })}
             </div>
           </div>
-        ) : !selectedBook && booksWithNotes.length > 0 ? (
-          /* 状态 B: 处于书架首页时，展示常读重点笔记书单 */
+        ) : !selectedBook && books.length > 0 ? (
+          /* 状态 B: 处于书架等全局视图时，展示用户自选的重点书单 */
           <div>
-            <div className="flex items-center gap-1.5 px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
-              <Bookmark className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
-              <span>重点笔记书单</span>
+            <div className="flex items-center justify-between px-3 text-xs font-semibold text-paper-muted dark:text-night-muted uppercase tracking-wider mb-2">
+              <div className="flex items-center gap-1.5">
+                <Bookmark className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+                <span>重点笔记书单</span>
+              </div>
+              {pinnedBooks.length > 0 && (
+                <span className="text-[10px] font-mono text-paper-muted/80 dark:text-night-muted/80">
+                  {pinnedBooks.length}
+                </span>
+              )}
             </div>
-            <div className="space-y-0.5">
-              {booksWithNotes.map(b => (
-                <button
-                  key={b.assetId}
-                  onClick={() => onSelectBook && onSelectBook(b)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors group"
-                >
-                  <span className="truncate max-w-[130px] font-serif group-hover:text-paper-terracotta dark:group-hover:text-night-terracotta">
-                    {b.title}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted font-mono">
-                    {b.highlightsCount}
-                  </span>
-                </button>
-              ))}
-            </div>
+
+            {pinnedBooks.length > 0 ? (
+              <div className="space-y-0.5">
+                {pinnedBooks.map(b => (
+                  <div
+                    key={b.assetId}
+                    className="group flex items-center justify-between px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors cursor-pointer"
+                    onClick={() => onSelectBook && onSelectBook(b)}
+                  >
+                    <span className="truncate max-w-[125px] font-serif group-hover:text-paper-terracotta dark:group-hover:text-night-terracotta">
+                      {b.title}
+                    </span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-paper-drawer dark:bg-night-drawer text-paper-muted dark:text-night-muted font-mono">
+                        {b.highlightsCount}
+                      </span>
+                      {onTogglePinBook && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            onTogglePinBook(b.assetId);
+                          }}
+                          className="hidden group-hover:inline-flex p-0.5 rounded text-paper-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                          title="从重点书单移出"
+                          aria-label={`从重点书单移出 ${b.title}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-3 py-2.5 rounded-lg bg-paper-drawer/50 dark:bg-night-drawer/50 border border-dashed border-paper-border/80 dark:border-night-border/80 space-y-2 text-[11px] text-paper-muted dark:text-night-muted">
+                <p className="leading-relaxed">
+                  暂未选择重点书籍，可在书架卡片或书籍详情页点按书签加入。
+                </p>
+                {booksWithNotes.length > 0 && onBatchPinBooks && (
+                  <button
+                    type="button"
+                    onClick={() => onBatchPinBooks(booksWithNotes.map(b => b.assetId))}
+                    className="w-full flex items-center justify-center gap-1 py-1 px-2 rounded bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border text-paper-terracotta dark:text-night-terracotta hover:border-paper-terracotta font-medium transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>加入有笔记的 {booksWithNotes.length} 本书</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
       </div>

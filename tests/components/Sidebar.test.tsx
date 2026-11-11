@@ -61,11 +61,24 @@ describe('Sidebar Component', () => {
     expect(graphHtml).toContain('知识网络');
   });
 
-  it('should render book notes shortcut list when books with highlights are provided', () => {
-    const html = renderToStaticMarkup(<Sidebar {...defaultProps} books={mockBooks} />);
+  it('should render book notes shortcut list when books with highlights are provided and pinned', () => {
+    const html = renderToStaticMarkup(
+      <Sidebar {...defaultProps} books={mockBooks} pinnedBookIds={['book-1']} onTogglePinBook={vi.fn()} />
+    );
     expect(html).toContain('重点笔记书单');
     expect(html).toContain('纳瓦尔宝典');
     expect(html).toContain('74');
+    expect(html).toContain('从重点书单移出 纳瓦尔宝典');
+  });
+
+  it('should render empty state guidance when user has not pinned any books', () => {
+    const html = renderToStaticMarkup(
+      <Sidebar {...defaultProps} books={mockBooks} pinnedBookIds={[]} onBatchPinBooks={vi.fn()} />
+    );
+    expect(html).toContain('重点笔记书单');
+    expect(html).toContain('暂未选择重点书籍');
+    expect(html).toContain('加入有笔记的 1 本书');
+    expect(html).not.toContain('>纳瓦尔宝典<');
   });
 
   it('should render chapters list when in book detail mode and hide redundant global tabs', () => {

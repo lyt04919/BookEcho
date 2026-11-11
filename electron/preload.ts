@@ -27,6 +27,8 @@ const api: BookEchoAPI = {
   getColorSemantics: () => ipcRenderer.invoke('semantics:get'),
   updateColorSemantic: (colorKey: HighlightColor, label: string, hexColor?: string) =>
     ipcRenderer.invoke('semantics:update', colorKey, label, hexColor),
+  getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
+  setSetting: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
   openInAppleBooks: (assetId: string, epubPath?: string | null) =>
     ipcRenderer.invoke('system:openAppleBooks', assetId, epubPath),
   openSystemPrivacySettings: () => ipcRenderer.invoke('system:openSystemPrivacy'),

@@ -58,11 +58,17 @@ export default function App() {
   const [demoTags, setDemoTags] = useState<string[]>(DEMO_TAGS);
   const [demoAnnotations, setDemoAnnotations] = useState<AnnotationItem[]>(DEMO_ANNOTATIONS);
   const [isColorSettingsOpen, setIsColorSettingsOpen] = useState(false);
+  const [pinnedBookIds, setPinnedBookIds] = useState<string[]>([]);
+  const [demoPinnedBookIds, setDemoPinnedBookIds] = useState<string[]>([
+    'demo-book-naval',
+    'demo-book-munger'
+  ]);
 
   // 活跃数据（支持在真实库与示例测试数据间平滑切换）
   const activeBooks = isDemoMode ? DEMO_BOOKS : books;
   const activeTags = isDemoMode ? demoTags : tags;
   const activeAnnotations = isDemoMode ? demoAnnotations : allAnnotations;
+  const activePinnedBookIds = isDemoMode ? demoPinnedBookIds : pinnedBookIds;
 
   // 跳转到知识网络图谱并聚焦指定高亮节点
   const handleOpenInGraph = (annotation: AnnotationItem) => {
@@ -76,15 +82,26 @@ export default function App() {
   const loadInitialData = async () => {
     try {
       if (typeof window !== 'undefined' && window.bookEchoAPI) {
-        const [fetchedBooks, semantics, fetchedTags, allAnnos] = await Promise.all([
+        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw] = await Promise.all([
           window.bookEchoAPI.getBooks(),
           window.bookEchoAPI.getColorSemantics(),
           window.bookEchoAPI.getAllTags(),
-          window.bookEchoAPI.getBookAnnotations()
+          window.bookEchoAPI.getBookAnnotations(),
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('pinned_book_ids') : Promise.resolve(null)
         ]);
         setBooks(fetchedBooks || []);
         if (semantics && semantics.length > 0) {
           setColorSemantics(semantics);
+        }
+        if (pinnedRaw) {
+          try {
+            const parsed = JSON.parse(pinnedRaw);
+            if (Array.isArray(parsed)) {
+              setPinnedBookIds(parsed.filter((id): id is string => typeof id === 'string'));
+            }
+          } catch {
+            // 忽略异常设置
+          }
         }
         setTags(fetchedTags || []);
         setAllAnnotations(allAnnos || []);
@@ -338,6 +355,35 @@ export default function App() {
         console.error('Failed to save color semantics', err);
       }
     }
+  };
+
+  // 保存并切换用户手动勾选的重点书单
+  const savePinnedBooks = async (nextIds: string[]) => {
+    if (isDemoMode) {
+      setDemoPinnedBookIds(nextIds);
+      return;
+    }
+    setPinnedBookIds(nextIds);
+    if (typeof window !== 'undefined' && window.bookEchoAPI?.setSetting) {
+      try {
+        await window.bookEchoAPI.setSetting('pinned_book_ids', JSON.stringify(nextIds));
+      } catch (err) {
+        console.error('Failed to persist pinned books', err);
+      }
+    }
+  };
+
+  const handleTogglePinBook = (assetId: string) => {
+    const nextIds = activePinnedBookIds.includes(assetId)
+      ? activePinnedBookIds.filter(id => id !== assetId)
+      : [...activePinnedBookIds, assetId];
+    void savePinnedBooks(nextIds);
+  };
+
+  const handleBatchPinBooks = (assetIds: string[]) => {
+    if (assetIds.length === 0) return;
+    const nextIds = Array.from(new Set([...activePinnedBookIds, ...assetIds]));
+    void savePinnedBooks(nextIds);
   };
 
   // 标签增删
@@ -613,6 +659,9 @@ export default function App() {
           }
         }}
         books={activeBooks}
+        pinnedBookIds={activePinnedBookIds}
+        onTogglePinBook={handleTogglePinBook}
+        onBatchPinBooks={handleBatchPinBooks}
         selectedBook={selectedBook}
         onSelectBook={handleSelectBook}
         chapters={bookChapters.length > 0 ? bookChapters : currentBookChapters}
@@ -844,9 +893,16 @@ export default function App() {
             isLoadingChapterContent={isLoadingChapterContent}
             onReadChapter={handleReadChapter}
             onCloseChapterReader={() => setReadingChapterContent(null)}
+            isPinned={activePinnedBookIds.includes(selectedBook.assetId)}
+            onTogglePinBook={handleTogglePinBook}
           />
         ) : (
-          <BookshelfView books={activeBooks} onSelectBook={handleSelectBook} />
+          <BookshelfView
+            books={activeBooks}
+            onSelectBook={handleSelectBook}
+            pinnedBookIds={activePinnedBookIds}
+            onTogglePinBook={handleTogglePinBook}
+          />
         )}
       </main>
 

@@ -273,6 +273,18 @@ function registerIpcHandlers() {
     vault.updateColorSemantic(colorKey, label, hexColor);
   });
 
+  const ALLOWED_UI_SETTINGS = new Set(['pinned_book_ids']);
+
+  ipcMain.handle('settings:get', async (_, key: string) => {
+    if (!ALLOWED_UI_SETTINGS.has(key)) return null;
+    return vault.getSetting(key);
+  });
+
+  ipcMain.handle('settings:set', async (_, key: string, value: string) => {
+    if (!ALLOWED_UI_SETTINGS.has(key)) return;
+    vault.setSetting(key, value);
+  });
+
   ipcMain.handle('system:openAppleBooks', async (_, _assetId: string, epubPath?: string | null) => {
     if (epubPath && typeof epubPath === 'string' && fs.existsSync(epubPath)) {
       const lower = epubPath.toLowerCase();

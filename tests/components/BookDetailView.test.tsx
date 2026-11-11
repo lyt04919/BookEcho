@@ -289,5 +289,17 @@ describe('BookDetailView Component', () => {
     const html = renderToStaticMarkup(<BookDetailView {...props} />);
     expect(html).toContain('编辑语义');
   });
+
+  it('should render bookmark pin button for toggling book in pinned list', () => {
+    const unpinnedHtml = renderToStaticMarkup(
+      <BookDetailView {...createDefaultProps({ isPinned: false, onTogglePinBook: vi.fn() })} />
+    );
+    expect(unpinnedHtml).toContain('加入重点书单');
+
+    const pinnedHtml = renderToStaticMarkup(
+      <BookDetailView {...createDefaultProps({ isPinned: true, onTogglePinBook: vi.fn() })} />
+    );
+    expect(pinnedHtml).toContain('已在重点书单');
+  });
 });
 
