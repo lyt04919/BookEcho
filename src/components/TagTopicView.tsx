@@ -192,52 +192,57 @@ export const TagTopicView: React.FC<TagTopicViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
       {/* 1. 顶部标题与新建标签栏 */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-6 mb-8 border-b border-paper-border dark:border-night-border gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-paper-terracotta/10 dark:bg-night-terracotta/15 text-paper-terracotta dark:text-night-terracotta text-xs font-medium mb-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-6 mb-8 border-b border-paper-border/80 dark:border-night-border/80 gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-paper-terracotta/10 dark:bg-night-terracotta/15 text-paper-terracotta dark:text-night-terracotta text-xs font-medium mb-1">
             <Tag className="w-3.5 h-3.5" />
             <span>跨书主题聚合工作台</span>
           </div>
-          <h1 className="font-serif text-3xl font-bold text-paper-text dark:text-night-text">
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-paper-text dark:text-night-text">
             标签管理与主题馆
           </h1>
-          <p className="text-xs text-paper-muted dark:text-night-muted mt-1.5">
+          <p className="text-xs text-paper-muted dark:text-night-muted">
             在此统一新建、重命名或删除标签；在书籍高亮卡片中可直接点选已有标签，无需重复输入
           </p>
         </div>
 
         {/* 右上角操作区：新建全局标签与切换网络图谱 */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap flex-shrink-0">
           {onSwitchToGraph && (
             <button
               onClick={onSwitchToGraph}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text hover:text-paper-terracotta dark:hover:text-night-terracotta text-xs font-medium shadow-2xs hover:shadow-sm transition-all"
-              title="切换至 Obsidian 式网状关系图谱"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text hover:text-paper-terracotta dark:hover:text-night-terracotta hover:border-paper-terracotta/50 text-xs font-medium shadow-2xs hover:shadow-sm transition-all flex-shrink-0"
+              title="切换至知识网络图谱"
             >
-              <Waypoints className="w-3.5 h-3.5 text-amber-500" />
+              <Waypoints className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
               <span>知识网络图谱</span>
             </button>
           )}
 
-          <div className="relative">
-            <input
-              type="text"
-              value={newTagName}
-              onChange={e => setNewTagName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCreateTag();
-              }}
-              placeholder="输入新标签名（如：心智模型）"
-              className="pl-3 pr-3 py-2 text-xs rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text placeholder:text-paper-muted dark:placeholder:text-night-muted focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta w-44"
-            />
+          {/* 新建标签一体化输入组件 */}
+          <div className="flex items-center rounded-xl border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card shadow-2xs p-1 focus-within:ring-1 focus-within:ring-paper-terracotta dark:focus-within:ring-night-terracotta focus-within:border-paper-terracotta dark:focus-within:border-night-terracotta transition-all flex-shrink-0">
+            <div className="flex items-center pl-2.5 pr-1">
+              <span className="text-paper-muted dark:text-night-muted text-xs font-mono select-none">#</span>
+              <input
+                type="text"
+                value={newTagName}
+                onChange={e => setNewTagName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCreateTag();
+                }}
+                placeholder="输入新标签名..."
+                className="pl-1.5 pr-2 py-1 text-xs bg-transparent text-paper-text dark:text-night-text placeholder:text-paper-muted/70 dark:placeholder:text-night-muted/70 focus:outline-none w-32 sm:w-40 transition-all"
+              />
+            </div>
+            <button
+              onClick={handleCreateTag}
+              disabled={!newTagName.trim()}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-2xs hover:opacity-95 active:scale-95 disabled:opacity-40 disabled:hover:opacity-40 transition-all flex-shrink-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>新建标签</span>
+            </button>
           </div>
-          <button
-            onClick={handleCreateTag}
-            className="flex items-center gap-1 px-3.5 py-2 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>新建标签</span>
-          </button>
         </div>
       </div>
 
