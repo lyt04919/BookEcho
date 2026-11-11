@@ -181,9 +181,9 @@ describe('BookshelfView Component', () => {
 
       expect(element).toBeDefined();
 
-      // Check header controls
-      const [headerDiv, gridDiv] = element.props.children;
-      const sortControlsDiv = headerDiv.props.children[1];
+      // Check toolbar controls
+      const [_headerDiv, toolbarDiv, gridDiv] = element.props.children;
+      const sortControlsDiv = toolbarDiv.props.children[1];
       const [_icon, _label, recentBtn, highlightsBtn, titleBtn] = sortControlsDiv.props.children;
 
       recentBtn.props.onClick();
