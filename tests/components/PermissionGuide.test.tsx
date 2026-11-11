@@ -13,6 +13,8 @@ describe('PermissionGuide Component', () => {
     expect(html).toContain('需要 Apple Books 数据读取权限');
     expect(html).toContain('macOS 对 Apple Books 容器');
     expect(html).toContain('~/Library/Containers/com.apple.iBooksX');
+    expect(html).toContain('不会自动弹出或自动添加新软件');
+    expect(html).toContain('完全退出并重新打开 BookEcho');
   });
 
   it('should render all action buttons with correct labels', () => {
