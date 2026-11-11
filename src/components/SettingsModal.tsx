@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AnnotationItem, ColorSemanticConfig, HighlightColor } from '../../electron/types/ipc';
 import { DEFAULT_COLOR_SEMANTICS, SEMANTIC_PRESETS } from './ColorSemanticsModal';
+import appIcon from '../assets/icon.png';
 
 export type SettingsTabId = 'general' | 'highlights' | 'storage' | 'export' | 'about';
 
@@ -646,9 +647,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'about' && (
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-paper-terracotta/10 dark:bg-night-terracotta/20 border border-paper-terracotta/30 flex items-center justify-center font-serif text-xl font-bold text-paper-terracotta dark:text-night-terracotta">
-                    BE
-                  </div>
+                  <img
+                    src={appIcon}
+                    alt="BookEcho"
+                    className="w-14 h-14 rounded-2xl shadow-sm flex-shrink-0"
+                  />
                   <div>
                     <h3 className="font-serif text-lg font-bold text-paper-text dark:text-night-text">
                       BookEcho

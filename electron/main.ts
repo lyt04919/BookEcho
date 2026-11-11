@@ -424,13 +424,22 @@ function registerIpcHandlers() {
   });
 }
 
+function getDockIconPath(): string {
+  return path.join(
+    __dirname,
+    process.env.VITE_DEV_SERVER_URL ? '../public/dock-icon.png' : '../dist/dock-icon.png'
+  );
+}
+
 function createWindow() {
+  const iconPath = getDockIconPath();
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -454,6 +463,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = getDockIconPath();
+    if (fs.existsSync(iconPath)) {
+      app.dock.setIcon(iconPath);
+    }
+  }
   initializeServices();
   registerIpcHandlers();
   createWindow();

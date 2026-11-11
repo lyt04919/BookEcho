@@ -19,6 +19,7 @@ import {
   Settings
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
+import appIcon from '../assets/icon.png';
 
 export type NavTab = 'books' | 'search' | 'starred_notes' | 'insights' | 'tags' | 'graph';
 
@@ -103,9 +104,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="h-6 -mt-4 pt-4 -mx-4 px-4 app-drag"></div>
 
         {/* 软件标题（支持按住拖拽窗口） */}
-        <div className="px-2 app-drag">
-          <h1 className="font-serif text-xl font-bold tracking-wide text-paper-text dark:text-night-text">BookEcho</h1>
-          <p className="text-xs text-paper-muted dark:text-night-muted mt-0.5">个人读书精华馆</p>
+        <div className="px-2 app-drag flex items-center gap-2.5">
+          <img src={appIcon} alt="BookEcho" className="w-8 h-8 rounded-lg shadow-xs flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="font-serif text-xl font-bold tracking-wide text-paper-text dark:text-night-text leading-tight">BookEcho</h1>
+            <p className="text-xs text-paper-muted dark:text-night-muted mt-0.5">个人读书精华馆</p>
+          </div>
         </div>
 
         {/* 主导航区：单书精读模式下仅保留「返回全部书架」，释放侧边栏空间给章节目录 */}
