@@ -284,7 +284,8 @@ function registerIpcHandlers() {
     'pinned_book_ids',
     'hidden_book_ids',
     'custom_apple_books_dir',
-    'export_format'
+    'export_format',
+    'theme_mode'
   ]);
 
   ipcMain.handle('settings:get', async (_, key: string) => {
@@ -357,6 +358,7 @@ function registerIpcHandlers() {
           const b = bookMap.get(item.assetId);
           return {
             ...item,
+            chapterTitle: meta?.resolvedChapter || item.chapterTitle,
             bookTitle: b?.title || '未知书籍',
             author: b?.author || null,
             customNote: meta?.customNote || '',
@@ -463,4 +465,14 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  if (vault) {
+    try {
+      vault.close();
+    } catch {
+      // ignore close errors on quit
+    }
+  }
 });

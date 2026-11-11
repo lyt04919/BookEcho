@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   BookItem,
   AnnotationItem,
@@ -19,7 +19,6 @@ import { HighlightCard } from './components/HighlightCard';
 import { InsightsView } from './components/InsightsView';
 import { GlobalSearchView } from './components/GlobalSearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
-import { ColorSemanticsModal } from './components/ColorSemanticsModal';
 import { SettingsModal, SettingsTabId } from './components/SettingsModal';
 import { DEMO_BOOKS, DEMO_TAGS, DEMO_ANNOTATIONS, DEMO_READING_STATS } from './data/mockTestData';
 import { MessageSquareQuote, Download, Sparkles, X } from 'lucide-react';
@@ -57,7 +56,12 @@ export default function App() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<AnnotationItem[]>([]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('bookecho_theme_mode') === 'dark';
+    }
+    return false;
+  });
   const [activeQuoteItem, setActiveQuoteItem] = useState<AnnotationItem | null>(null);
   const [exportBookAssetId, setExportBookAssetId] = useState<string | null>(null);
   const [hasPermissionError, setHasPermissionError] = useState(false);
@@ -72,7 +76,6 @@ export default function App() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoTags, setDemoTags] = useState<string[]>(DEMO_TAGS);
   const [demoAnnotations, setDemoAnnotations] = useState<AnnotationItem[]>(DEMO_ANNOTATIONS);
-  const [isColorSettingsOpen, setIsColorSettingsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTabId>('general');
   const [customDataDir, setCustomDataDir] = useState<string | null>(null);
@@ -85,6 +88,13 @@ export default function App() {
   const [hiddenBookIds, setHiddenBookIds] = useState<string[]>([]);
   const [demoHiddenBookIds, setDemoHiddenBookIds] = useState<string[]>([]);
   const [readingStats, setReadingStats] = useState<AppleBooksReadingStats | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 2600);
+  };
 
   // 活跃数据（支持在真实库与示例测试数据间平滑切换）
   const activeBooks = isDemoMode ? DEMO_BOOKS : books;
@@ -106,7 +116,7 @@ export default function App() {
   const loadInitialData = async () => {
     try {
       if (typeof window !== 'undefined' && window.bookEchoAPI) {
-        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw, customDirRaw, exportFmtRaw, fetchedReadingStats] = await Promise.all([
+        const [fetchedBooks, semantics, fetchedTags, allAnnos, pinnedRaw, hiddenRaw, customDirRaw, exportFmtRaw, themeModeRaw, fetchedReadingStats] = await Promise.all([
           window.bookEchoAPI.getBooks(),
           window.bookEchoAPI.getColorSemantics(),
           window.bookEchoAPI.getAllTags(),
@@ -115,6 +125,7 @@ export default function App() {
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('hidden_book_ids') : Promise.resolve(null),
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('custom_apple_books_dir') : Promise.resolve(null),
           window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('export_format') : Promise.resolve(null),
+          window.bookEchoAPI.getSetting ? window.bookEchoAPI.getSetting('theme_mode') : Promise.resolve(null),
           window.bookEchoAPI.getReadingStats ? window.bookEchoAPI.getReadingStats().catch(() => null) : Promise.resolve(null)
         ]);
         setBooks(fetchedBooks || []);
@@ -129,10 +140,17 @@ export default function App() {
         if (exportFmtRaw === 'standard' || exportFmtRaw === 'obsidian') {
           setExportFormatPref(exportFmtRaw);
         }
+        if (themeModeRaw === 'dark' || themeModeRaw === 'light') {
+          setIsDarkMode(themeModeRaw === 'dark');
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem('bookecho_theme_mode', themeModeRaw);
+          }
+        }
         if (fetchedReadingStats) setReadingStats(fetchedReadingStats);
         setTags(fetchedTags || []);
         setAllAnnotations(allAnnos || []);
         setHasPermissionError(false);
+        return fetchedBooks || [];
       }
     } catch (e: any) {
       console.error('Failed to load initial Apple Books data', e);
@@ -175,7 +193,7 @@ export default function App() {
       } else if (e.key === 'Escape') {
         const target = e.target as { tagName?: string } | null;
         if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
-        if (activeQuoteItem || exportBookAssetId || isSettingsOpen || isColorSettingsOpen) return;
+        if (activeQuoteItem || exportBookAssetId || isSettingsOpen) return;
         if (readingChapterContent) {
           setReadingChapterContent(null);
         } else if (selectedTag) {
@@ -192,7 +210,7 @@ export default function App() {
       window.addEventListener('keydown', handleGlobalKeyDown);
       return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }
-  }, [activeQuoteItem, exportBookAssetId, isSettingsOpen, isColorSettingsOpen, readingChapterContent, selectedTag, selectedBook]);
+  }, [activeQuoteItem, exportBookAssetId, isSettingsOpen, readingChapterContent, selectedTag, selectedBook]);
 
   // 切换单书精读
   const handleSelectBook = async (book: BookItem) => {
@@ -257,14 +275,36 @@ export default function App() {
   const handleRefreshData = async () => {
     setIsRefreshing(true);
     try {
-      await loadInitialData();
+      const refreshedBooks = await loadInitialData();
       if (selectedBook && typeof window !== 'undefined' && window.bookEchoAPI) {
-        const annos = await window.bookEchoAPI.getBookAnnotations(selectedBook.assetId);
+        const [annos, chs] = await Promise.all([
+          window.bookEchoAPI.getBookAnnotations(selectedBook.assetId),
+          window.bookEchoAPI.getBookChapters(selectedBook.assetId)
+        ]);
         setCurrentAnnotations(annos || []);
+        setBookChapters(chs || []);
+        const updatedBook = refreshedBooks?.find(b => b.assetId === selectedBook.assetId);
+        if (updatedBook) setSelectedBook(updatedBook);
       }
+      showToast('已同步最新划线与阅读数据');
     } finally {
       setTimeout(() => setIsRefreshing(false), 500);
     }
+  };
+
+  // 切换并持久化浅色/深色外观
+  const handleToggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const next = !prev;
+      const modeStr = next ? 'dark' : 'light';
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('bookecho_theme_mode', modeStr);
+      }
+      if (typeof window !== 'undefined' && window.bookEchoAPI?.setSetting) {
+        window.bookEchoAPI.setSetting('theme_mode', modeStr).catch(() => {});
+      }
+      return next;
+    });
   };
 
   // 全局搜索触发（防抖 250ms，演示模式在前端内存中基于 activeAnnotations 搜索，避免污染）
@@ -725,7 +765,7 @@ export default function App() {
         selectedTag={selectedTag}
         onSelectTag={setSelectedTag}
         isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        onToggleDarkMode={handleToggleDarkMode}
         onSelectCustomDir={handleSelectCustomDir}
         books={activeBooks}
         pinnedBookIds={activePinnedBookIds}
@@ -952,7 +992,7 @@ export default function App() {
             }}
             onOpenInAppleBooks={(id, p) => {
               if (isDemoMode) {
-                alert('演示模式提示：当前为测试体验书籍，本地 Apple Books 原生应用中未收录此书文件。');
+                showToast('演示模式提示：本地 Apple Books 中未收录此体验书籍');
                 return;
               }
               if (typeof window !== 'undefined' && window.bookEchoAPI) {
@@ -1039,12 +1079,16 @@ export default function App() {
               a.click();
               URL.revokeObjectURL(url);
               setExportBookAssetId(null);
+              showToast('已导出 Markdown 笔记');
               return;
             }
 
             if (typeof window !== 'undefined' && window.bookEchoAPI) {
-              await window.bookEchoAPI.exportMarkdown(exportBookAssetId, fmt);
+              const res = await window.bookEchoAPI.exportMarkdown(exportBookAssetId, fmt);
               setExportBookAssetId(null);
+              if (res?.success) {
+                showToast('已成功导出 Markdown 笔记');
+              }
             }
           }}
         />
@@ -1056,7 +1100,7 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         initialTab={settingsInitialTab}
         isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        onToggleDarkMode={handleToggleDarkMode}
         colorSemantics={colorSemantics}
         onSaveColorSemantics={handleSaveColorSemantics}
         annotations={activeAnnotations}
@@ -1078,18 +1122,18 @@ export default function App() {
         onUpdateExportFormat={handleUpdateExportFormat}
       />
 
-      {/* 高亮颜色语义与配色自定义弹窗（向后兼容） */}
-      {isColorSettingsOpen && (
-        <ColorSemanticsModal
-          colorSemantics={colorSemantics}
-          annotations={activeAnnotations}
-          onSave={handleSaveColorSemantics}
-          onClose={() => setIsColorSettingsOpen(false)}
-        />
+      {/* 全局轻提示 Toast */}
+      {toastMessage && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-paper-text dark:bg-night-card text-white dark:text-night-text border border-white/10 dark:border-night-border shadow-lg text-xs font-medium pointer-events-none"
+        >
+          {toastMessage}
+        </div>
       )}
 
       {/* 全局窗口顶部无边框拖拽条（避开左上角红绿灯；弹窗打开时自动退避避免拦截关闭按钮点击） */}
-      {!isSettingsOpen && !isColorSettingsOpen && !activeQuoteItem && !exportBookAssetId && (
+      {!isSettingsOpen && !activeQuoteItem && !exportBookAssetId && (
         <div
           className="fixed top-0 left-20 right-0 h-6 z-20 app-drag"
           aria-hidden="true"

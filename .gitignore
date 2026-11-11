@@ -13,3 +13,4 @@ dist-electron
 release
 .DS_Store
 *.local
+.superpowers
