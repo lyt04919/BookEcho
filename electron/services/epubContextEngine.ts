@@ -11,12 +11,34 @@ interface SpineItem {
 
 export class EpubContextEngine {
   private parser: XMLParser;
+  private zipCache: Map<string, { zip: AdmZip; mtimeMs: number }> = new Map();
+  private coverCache: Map<string, { coverUrl: string | null; mtimeMs: number }> = new Map();
+  private tocCache: Map<string, { toc: string[]; mtimeMs: number }> = new Map();
 
   constructor() {
     this.parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@_'
     });
+  }
+
+  private getZip(epubPath: string): AdmZip | null {
+    try {
+      const stat = fs.statSync(epubPath);
+      const cached = this.zipCache.get(epubPath);
+      if (cached && cached.mtimeMs === stat.mtimeMs) {
+        return cached.zip;
+      }
+      const zip = new AdmZip(epubPath);
+      if (this.zipCache.size >= 15) {
+        const oldestKey = this.zipCache.keys().next().value;
+        if (oldestKey) this.zipCache.delete(oldestKey);
+      }
+      this.zipCache.set(epubPath, { zip, mtimeMs: stat.mtimeMs });
+      return zip;
+    } catch {
+      return null;
+    }
   }
 
   private readEpubFileContent(epubPath: string, relativePath: string): string | null {
@@ -38,7 +60,8 @@ export class EpubContextEngine {
     }
 
     try {
-      const zip = new AdmZip(epubPath);
+      const zip = this.getZip(epubPath);
+      if (!zip) return null;
       let entry = zip.getEntry(normalizedRelPath);
       if (!entry) {
         const entries = zip.getEntries();
@@ -433,11 +456,28 @@ export class EpubContextEngine {
   public extractCover(epubPath: string): string | null {
     if (!epubPath || !fs.existsSync(epubPath)) return null;
 
+    let mtimeMs = 0;
+    try {
+      mtimeMs = fs.statSync(epubPath).mtimeMs;
+      const cached = this.coverCache.get(epubPath);
+      if (cached && cached.mtimeMs === mtimeMs) {
+        return cached.coverUrl;
+      }
+    } catch {
+      return null;
+    }
+
     const opfPath = this.getOpfPath(epubPath);
-    if (!opfPath) return null;
+    if (!opfPath) {
+      this.coverCache.set(epubPath, { coverUrl: null, mtimeMs });
+      return null;
+    }
 
     const opfContent = this.readEpubFileContent(epubPath, opfPath);
-    if (!opfContent) return null;
+    if (!opfContent) {
+      this.coverCache.set(epubPath, { coverUrl: null, mtimeMs });
+      return null;
+    }
 
     const opfDir = path.dirname(opfPath);
 
@@ -475,7 +515,10 @@ export class EpubContextEngine {
         if (hrefCover) coverHref = hrefCover['@_href'];
       }
 
-      if (!coverHref) return null;
+      if (!coverHref) {
+        this.coverCache.set(epubPath, { coverUrl: null, mtimeMs });
+        return null;
+      }
 
       const normalizedRelPath = path.posix.join(opfDir, coverHref).replace(/^\//, '');
       let imgBuf: Buffer | null = null;
@@ -486,19 +529,25 @@ export class EpubContextEngine {
           imgBuf = fs.readFileSync(fullPath);
         }
       } else {
-        const zip = new AdmZip(epubPath);
-        const entry = zip.getEntry(normalizedRelPath);
-        if (entry) {
+        const zip = this.getZip(epubPath);
+        const entry = zip?.getEntry(normalizedRelPath);
+        if (entry && zip) {
           imgBuf = zip.readFile(entry);
         }
       }
 
-      if (!imgBuf) return null;
+      if (!imgBuf) {
+        this.coverCache.set(epubPath, { coverUrl: null, mtimeMs });
+        return null;
+      }
 
       const ext = path.extname(coverHref).toLowerCase().replace('.', '');
       const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-      return `data:${mime};base64,${imgBuf.toString('base64')}`;
+      const dataUri = `data:${mime};base64,${imgBuf.toString('base64')}`;
+      this.coverCache.set(epubPath, { coverUrl: dataUri, mtimeMs });
+      return dataUri;
     } catch {
+      this.coverCache.set(epubPath, { coverUrl: null, mtimeMs });
       return null;
     }
   }
@@ -506,8 +555,22 @@ export class EpubContextEngine {
   public extractTableOfContents(epubPath: string): string[] {
     if (!epubPath || !fs.existsSync(epubPath)) return [];
 
+    let mtimeMs = 0;
+    try {
+      mtimeMs = fs.statSync(epubPath).mtimeMs;
+      const cached = this.tocCache.get(epubPath);
+      if (cached && cached.mtimeMs === mtimeMs) {
+        return cached.toc;
+      }
+    } catch {
+      return [];
+    }
+
     const opfPath = this.getOpfPath(epubPath);
-    if (!opfPath) return [];
+    if (!opfPath) {
+      this.tocCache.set(epubPath, { toc: [], mtimeMs });
+      return [];
+    }
 
     const { opfDir, spine, tocHref } = this.parseSpineAndManifest(epubPath, opfPath);
     const titles: string[] = [];
@@ -602,6 +665,7 @@ export class EpubContextEngine {
       }
     }
 
+    this.tocCache.set(epubPath, { toc: titles, mtimeMs });
     return titles;
   }
 

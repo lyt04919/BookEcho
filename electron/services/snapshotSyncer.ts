@@ -33,6 +33,7 @@ export class SnapshotSyncer {
   private cacheDir: string;
   private bkDir: string;
   private aeDir: string;
+  private snapshotSignatures: Map<string, string> = new Map();
 
   constructor(options: SyncerOptions) {
     this.cacheDir = options.cacheDir;
@@ -55,8 +56,40 @@ export class SnapshotSyncer {
     return dbFile ? path.join(dir, dbFile) : null;
   }
 
+  private getSourceSignature(sourceDbPath: string): string {
+    try {
+      const stat = fs.statSync(sourceDbPath);
+      let sig = `${stat.mtimeMs}:${stat.size}`;
+      const wal = `${sourceDbPath}-wal`;
+      if (fs.existsSync(wal)) {
+        const wStat = fs.statSync(wal);
+        sig += `|wal:${wStat.mtimeMs}:${wStat.size}`;
+      } else {
+        sig += '|wal:none';
+      }
+      const shm = `${sourceDbPath}-shm`;
+      if (fs.existsSync(shm)) {
+        const sStat = fs.statSync(shm);
+        sig += `|shm:${sStat.mtimeMs}:${sStat.size}`;
+      } else {
+        sig += '|shm:none';
+      }
+      return sig;
+    } catch {
+      return '';
+    }
+  }
+
   private createSnapshot(sourceDbPath: string, targetName: string): string {
     const targetDbPath = path.join(this.cacheDir, targetName);
+    const sourceSig = this.getSourceSignature(sourceDbPath);
+    const cachedSig = this.snapshotSignatures.get(targetName);
+
+    // 若源库与其 WAL/SHM 无任何变化且目标快照存在，直接复用快照，避免重复巨量 IO
+    if (sourceSig && cachedSig === sourceSig && fs.existsSync(targetDbPath)) {
+      return targetDbPath;
+    }
+
     fs.copyFileSync(sourceDbPath, targetDbPath);
 
     // 同步复制 WAL 和 SHM（如果存在），保证只读查询数据完整且不锁死主库
@@ -75,6 +108,10 @@ export class SnapshotSyncer {
       fs.copyFileSync(shmSource, shmTarget);
     } else if (fs.existsSync(shmTarget)) {
       fs.unlinkSync(shmTarget);
+    }
+
+    if (sourceSig) {
+      this.snapshotSignatures.set(targetName, sourceSig);
     }
 
     return targetDbPath;

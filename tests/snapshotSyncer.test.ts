@@ -122,4 +122,26 @@ describe('SnapshotSyncer & SQLite Extraction', () => {
     expect(fs.existsSync(cachedWal)).toBe(false);
     expect(fs.existsSync(cachedShm)).toBe(false);
   });
+
+  it('should reuse cached snapshot when database and wal/shm have not modified', () => {
+    const syncer = new SnapshotSyncer({
+      customBkDir: mockPaths.bkDir,
+      customAeDir: mockPaths.aeDir,
+      cacheDir: cacheDir
+    });
+
+    const booksFirst = syncer.extractBooks();
+    const snapshotPath = path.join(cacheDir, 'snapshot_BKLibrary.sqlite');
+    expect(fs.existsSync(snapshotPath)).toBe(true);
+
+    const firstMtime = fs.statSync(snapshotPath).mtimeMs;
+
+    // Second call without touching source files
+    const booksSecond = syncer.extractBooks();
+    const secondMtime = fs.statSync(snapshotPath).mtimeMs;
+
+    expect(booksFirst.length).toBe(booksSecond.length);
+    // Snapshot should not have been overwritten or copied again
+    expect(secondMtime).toBe(firstMtime);
+  });
 });

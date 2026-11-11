@@ -88,9 +88,15 @@ export default function App() {
         setAllAnnotations(allAnnos || []);
         setHasPermissionError(false);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load initial Apple Books data', e);
-      setHasPermissionError(true);
+      const errMsg = String(e?.message || e || '');
+      const isPerm =
+        errMsg.includes('EACCES') ||
+        errMsg.includes('EPERM') ||
+        errMsg.includes('permission') ||
+        errMsg.includes('operation not permitted');
+      setHasPermissionError(isPerm);
     }
   };
 
@@ -211,9 +217,13 @@ export default function App() {
     }
   };
 
-  // 全局搜索触发（防抖 250ms）
+  // 全局搜索触发（防抖 250ms，演示模式在前端内存中基于 activeAnnotations 搜索，避免污染）
   useEffect(() => {
     const timer = setTimeout(async () => {
+      if (isDemoMode) {
+        setSearchResults([]);
+        return;
+      }
       if (searchKeyword.trim() && typeof window !== 'undefined' && window.bookEchoAPI) {
         try {
           const results = await window.bookEchoAPI.searchAnnotations(searchKeyword.trim());
@@ -227,7 +237,7 @@ export default function App() {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [searchKeyword]);
+  }, [searchKeyword, isDemoMode]);
 
   // 更新星标
   const handleToggleStar = async (uuid: string) => {
@@ -502,7 +512,20 @@ export default function App() {
       )
     : [];
 
-  const exportingBook = exportBookAssetId
+  const isExportingStarred = exportBookAssetId === '__STARRED_NOTES__';
+  const exportingBook: BookItem | null = isExportingStarred
+    ? ({
+        assetId: '__STARRED_NOTES__',
+        title: '全书库精选批注与星标',
+        author: '个人精华集',
+        genre: '精选合集',
+        readingProgress: 1,
+        lastOpenDateMs: Date.now(),
+        epubPath: null,
+        coverUrl: null,
+        highlightsCount: starredAndNoteAnnos.length
+      } as BookItem)
+    : exportBookAssetId
     ? activeBooks.find(b => b.assetId === exportBookAssetId) || selectedBook
     : null;
 
@@ -660,8 +683,7 @@ export default function App() {
               {starredAndNoteAnnos.length > 0 && (
                 <button
                   onClick={() => {
-                    const firstBook = activeBooks[0];
-                    if (firstBook) setExportBookAssetId(firstBook.assetId);
+                    setExportBookAssetId('__STARRED_NOTES__');
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-opacity"
                 >
@@ -737,6 +759,10 @@ export default function App() {
               setReadingChapterContent(null);
             }}
             onOpenInAppleBooks={(id, p) => {
+              if (isDemoMode) {
+                alert('演示模式提示：当前为测试体验书籍，本地 Apple Books 原生应用中未收录此书文件。');
+                return;
+              }
               if (typeof window !== 'undefined' && window.bookEchoAPI) {
                 window.bookEchoAPI.openInAppleBooks(id, p);
               }
@@ -785,8 +811,38 @@ export default function App() {
           bookTitle={exportingBook.title}
           onClose={() => setExportBookAssetId(null)}
           onConfirmExport={async fmt => {
+            if (isDemoMode || !window.bookEchoAPI) {
+              const annosToExport = isExportingStarred
+                ? starredAndNoteAnnos
+                : activeAnnotations.filter(a => a.assetId === exportBookAssetId);
+
+              const lines = [
+                `# ${exportingBook.title}`,
+                `> 导出时间：${new Date().toLocaleDateString('zh-CN')} · 共 ${annosToExport.length} 条笔记\n`
+              ];
+              for (const a of annosToExport) {
+                const b = activeBooks.find(book => book.assetId === a.assetId);
+                lines.push(`## 《${b?.title || a.bookTitle || '未知书籍'}》· ${a.chapterTitle || '默认章节'}`);
+                lines.push(`> “${a.selectedText}”`);
+                if (a.note) lines.push(`> 想法：${a.note}`);
+                if (a.customNote) lines.push(`> 延伸思考：${a.customNote}`);
+                if (a.tags && a.tags.length > 0) lines.push(`> 标签：${a.tags.map(t => `#${t}`).join(' ')}`);
+                lines.push('');
+              }
+              const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${exportingBook.title.replace(/[/\\?%*:|"<>]/g, '_')}_${fmt}.md`;
+              a.click();
+              URL.revokeObjectURL(url);
+              setExportBookAssetId(null);
+              return;
+            }
+
             if (typeof window !== 'undefined' && window.bookEchoAPI) {
               await window.bookEchoAPI.exportMarkdown(exportBookAssetId, fmt);
+              setExportBookAssetId(null);
             }
           }}
         />

@@ -164,4 +164,66 @@ describe('MarkdownExporter', () => {
       expect(obsidianMd).toContain(`> [!quote] ${header}`);
     }
   });
+
+  it('should format multi-book collection markdown for starred and custom notes', () => {
+    const multiAnnotations: AnnotationItem[] = [
+      {
+        uuid: 'anno-1',
+        assetId: 'book-1',
+        bookTitle: '纳瓦尔宝典',
+        selectedText: '致富不是靠运气，而是靠技能。',
+        note: '打造杠杆',
+        representativeText: null,
+        colorKey: 'yellow',
+        locationCfi: null,
+        chapterTitle: '第一章 财富',
+        creationDateMs: 1678307200000,
+        modificationDateMs: 1678307200000,
+        sortIndex: 1,
+        customNote: '复利思考',
+        isStarred: true,
+        tags: ['财富', '思维']
+      },
+      {
+        uuid: 'anno-2',
+        assetId: 'book-2',
+        bookTitle: '穷查理宝典',
+        selectedText: '反过来想，总是反过来想。',
+        note: null,
+        representativeText: null,
+        colorKey: 'blue',
+        locationCfi: null,
+        chapterTitle: '第二讲 多元思维模型',
+        creationDateMs: 1678307300000,
+        modificationDateMs: 1678307300000,
+        sortIndex: 2,
+        customNote: '逆向工程法',
+        isStarred: true,
+        tags: ['思维']
+      }
+    ];
+
+    const stdMd = MarkdownExporter.formatCollectionMarkdown(
+      '全书库精选批注与星标',
+      multiAnnotations,
+      'standard'
+    );
+    expect(stdMd).toContain('# 全书库精选批注与星标');
+    expect(stdMd).toContain('## 《纳瓦尔宝典》');
+    expect(stdMd).toContain('### 第一章 财富');
+    expect(stdMd).toContain('## 《穷查理宝典》');
+    expect(stdMd).toContain('### 第二讲 多元思维模型');
+    expect(stdMd).toContain('> ⭐ 致富不是靠运气，而是靠技能。');
+    expect(stdMd).toContain('> ⭐ 反过来想，总是反过来想。');
+
+    const obsMd = MarkdownExporter.formatCollectionMarkdown(
+      '全书库精选批注与星标',
+      multiAnnotations,
+      'obsidian'
+    );
+    expect(obsMd).toContain('title: "全书库精选批注与星标"');
+    expect(obsMd).toContain('## 《纳瓦尔宝典》');
+    expect(obsMd).toContain('> [!quote] 🟡 核心论点');
+    expect(obsMd).toContain('> [!quote] 🔵 概念与背景');
+  });
 });

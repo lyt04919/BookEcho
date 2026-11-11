@@ -53,6 +53,14 @@ describe('UserVaultDb & Secondary Annotations', () => {
 
     vault.removeTag('anno-1', '心理学');
     expect(vault.getTagsForAnnotation('anno-1')).toEqual(['思维模型']);
+
+    // Test batch extraction functions to prevent N+1 queries
+    const allMetas = vault.getAllAnnotationMetas();
+    expect(allMetas.get('anno-1')?.customNote).toBe('我的深度思考');
+    expect(allMetas.get('anno-1')?.isStarred).toBe(true);
+
+    const groupedTags = vault.getAllTagsGrouped();
+    expect(groupedTags.get('anno-1')).toEqual(['思维模型']);
   });
 
   it('should strip leading hash when adding tags and ignore empty tags', () => {

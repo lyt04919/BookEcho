@@ -116,4 +116,89 @@ export class MarkdownExporter {
 
     return lines.join('\n');
   }
+
+  public static formatCollectionMarkdown(
+    collectionTitle: string,
+    annotations: AnnotationItem[],
+    format: 'standard' | 'obsidian'
+  ): string {
+    const lines: string[] = [];
+
+    if (format === 'obsidian') {
+      lines.push('---');
+      lines.push(`title: "${collectionTitle.replace(/"/g, '\\"')}"`);
+      lines.push(`highlights_count: ${annotations.length}`);
+      lines.push(`exported_at: "${new Date().toISOString()}"`);
+      lines.push('tags:');
+      lines.push('  - books/highlights');
+      lines.push('  - books/starred_notes');
+      lines.push('---');
+      lines.push('');
+    }
+
+    lines.push(`# ${collectionTitle}`);
+    lines.push('');
+    lines.push(`> 汇聚全书库精选思考 · 共收录 ${annotations.length} 条批注与星标 · 导出时间：${new Date().toLocaleDateString('zh-CN')}`);
+    lines.push('');
+
+    // 按书籍聚合
+    const bookMap = new Map<string, AnnotationItem[]>();
+    for (const a of annotations) {
+      const bTitle = a.bookTitle || '未知书籍';
+      if (!bookMap.has(bTitle)) {
+        bookMap.set(bTitle, []);
+      }
+      bookMap.get(bTitle)!.push(a);
+    }
+
+    for (const [bTitle, bAnnos] of bookMap.entries()) {
+      lines.push(`## 《${bTitle}》`);
+      lines.push('');
+
+      const groupedByChapter = this.groupAnnotationsByChapter(bAnnos);
+      for (const [chapter, items] of groupedByChapter.entries()) {
+        lines.push(`### ${chapter}`);
+        lines.push('');
+
+        for (const item of items) {
+          const star = item.isStarred ? '⭐ ' : '';
+          const tagLine = item.tags && item.tags.length > 0 ? item.tags.map(t => `#${t}`).join(' ') : '';
+
+          if (format === 'obsidian') {
+            const calloutHeader = COLOR_EMOJIS[item.colorKey] || '🟡 高亮';
+            lines.push(`> [!quote] ${calloutHeader}`);
+            lines.push(...this.prefixLines(`${star}${item.selectedText}`));
+            if (item.note) {
+              lines.push('> ');
+              lines.push(...this.prefixLines(`**想法**：${item.note}`));
+            }
+            if (item.customNote) {
+              lines.push('> ');
+              lines.push(...this.prefixLines(`**延伸思考**：${item.customNote}`));
+            }
+            if (tagLine) {
+              lines.push('> ');
+              lines.push(`> 标签：${tagLine}`);
+            }
+          } else {
+            lines.push(...this.prefixLines(`${star}${item.selectedText}`));
+            lines.push('>');
+            if (item.note) {
+              lines.push(...this.prefixLines(`**批注**：${item.note}`));
+            }
+            if (item.customNote) {
+              lines.push(...this.prefixLines(`**延伸思考**：${item.customNote}`));
+            }
+            if (tagLine) {
+              lines.push(`> **标签**：${tagLine}`);
+            }
+          }
+
+          lines.push('');
+        }
+      }
+    }
+
+    return lines.join('\n');
+  }
 }

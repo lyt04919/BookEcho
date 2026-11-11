@@ -128,41 +128,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   // 基础映射
   const bookMap = useMemo(() => new Map(books.map(b => [b.assetId, b])), [books]);
 
-  // 1. 过滤符合条件的高亮
-  const filteredAnnotations = useMemo(() => {
-    return annotations.filter(a => {
-      if (selectedBookFilter !== 'all' && a.assetId !== selectedBookFilter) return false;
-      if (selectedTagFilter !== 'all' && !(a.tags || []).includes(selectedTagFilter)) return false;
-
-      if (searchKeyword.trim()) {
-        const kw = searchKeyword.toLowerCase();
-        const textMatch = (a.selectedText || '').toLowerCase().includes(kw);
-        const noteMatch = (a.note || '').toLowerCase().includes(kw);
-        const customMatch = (a.customNote || '').toLowerCase().includes(kw);
-        const tagMatch = (a.tags || []).some(t => t.toLowerCase().includes(kw));
-        const bookMatch = (a.bookTitle || '').toLowerCase().includes(kw);
-        if (!textMatch && !noteMatch && !customMatch && !tagMatch && !bookMatch) return false;
-      }
-
-      if (onlyConnected) {
-        // 只保留具有跨书同标签连接的高亮
-        const myTags = a.tags || [];
-        if (myTags.length === 0) return false;
-        const tagSet = new Set(myTags);
-        const hasCrossBookConnection = annotations.some(
-          other =>
-            other.uuid !== a.uuid &&
-            other.assetId !== a.assetId &&
-            (other.tags || []).some(t => tagSet.has(t))
-        );
-        if (!hasCrossBookConnection) return false;
-      }
-
-      return true;
-    });
-  }, [annotations, selectedBookFilter, selectedTagFilter, searchKeyword, onlyConnected]);
-
-  // 2. 统计各标签的统计数据（跨几本书、几条思考）
+  // 1. 统计各标签的统计数据（跨几本书、几条思考）- O(n)
   const tagStats = useMemo(() => {
     const map = new Map<string, { count: number; bookIds: Set<string> }>();
     for (const a of annotations) {
@@ -178,27 +144,49 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
     return map;
   }, [annotations]);
 
+  // 跨书产生连接的高亮 UUID 集合 - O(n) 倒排哈希，消除原有 O(n²) 嵌套双层循环
+  const connectedAnnoUuids = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of annotations) {
+      const hasConnection = (a.tags || []).some(t => (tagStats.get(t)?.bookIds.size || 0) > 1);
+      if (hasConnection) set.add(a.uuid);
+    }
+    return set;
+  }, [annotations, tagStats]);
+
+  // 跨书产生连接的高亮总数 - 直接取集合大小 O(1)
+  const crossBookHighlightsCount = connectedAnnoUuids.size;
+
+  // 2. 过滤符合条件的高亮
+  const filteredAnnotations = useMemo(() => {
+    return annotations.filter(a => {
+      if (selectedBookFilter !== 'all' && a.assetId !== selectedBookFilter) return false;
+      if (selectedTagFilter !== 'all' && !(a.tags || []).includes(selectedTagFilter)) return false;
+
+      if (searchKeyword.trim()) {
+        const kw = searchKeyword.toLowerCase();
+        const textMatch = (a.selectedText || '').toLowerCase().includes(kw);
+        const noteMatch = (a.note || '').toLowerCase().includes(kw);
+        const customMatch = (a.customNote || '').toLowerCase().includes(kw);
+        const tagMatch = (a.tags || []).some(t => t.toLowerCase().includes(kw));
+        const bookMatch = (a.bookTitle || '').toLowerCase().includes(kw);
+        if (!textMatch && !noteMatch && !customMatch && !tagMatch && !bookMatch) return false;
+      }
+
+      if (onlyConnected && !connectedAnnoUuids.has(a.uuid)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [annotations, selectedBookFilter, selectedTagFilter, searchKeyword, onlyConnected, connectedAnnoUuids]);
+
   // 有效标签列表（包含所有已有及新建的标签，按连接思考数量倒序）
   const activeTags = useMemo(() => {
     return availableTags
       .slice()
       .sort((a, b) => (tagStats.get(b)?.count || 0) - (tagStats.get(a)?.count || 0));
   }, [availableTags, tagStats]);
-
-  // 跨书产生连接的高亮总数
-  const crossBookHighlightsCount = useMemo(() => {
-    return annotations.filter(a => {
-      const myTags = a.tags || [];
-      if (myTags.length === 0) return false;
-      const tagSet = new Set(myTags);
-      return annotations.some(
-        other =>
-          other.uuid !== a.uuid &&
-          other.assetId !== a.assetId &&
-          (other.tags || []).some(t => tagSet.has(t))
-      );
-    }).length;
-  }, [annotations]);
 
   // 3. 计算抽屉聚焦节点信息（兼容 initialFocusedNodeId）
   const focusedNodeInfo = useMemo(() => {

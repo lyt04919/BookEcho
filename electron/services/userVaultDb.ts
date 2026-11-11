@@ -131,6 +131,36 @@ export class UserVaultDb {
     };
   }
 
+  public getAllAnnotationMetas(): Map<string, AnnotationMetaRecord> {
+    const rows = this.db.prepare(`
+      SELECT
+        annotation_uuid as annotationUuid,
+        custom_note as customNote,
+        is_starred as isStarred,
+        review_status as reviewStatus,
+        review_count as reviewCount,
+        last_reviewed_at as lastReviewedAtMs,
+        resolved_chapter as resolvedChapter,
+        sort_index as sortIndex
+      FROM annotation_meta
+    `).all() as any[];
+
+    const map = new Map<string, AnnotationMetaRecord>();
+    for (const row of rows) {
+      map.set(row.annotationUuid, {
+        annotationUuid: row.annotationUuid,
+        customNote: row.customNote || '',
+        isStarred: row.isStarred === 1,
+        reviewStatus: row.reviewStatus || 'active',
+        reviewCount: row.reviewCount || 0,
+        lastReviewedAtMs: row.lastReviewedAtMs || null,
+        resolvedChapter: row.resolvedChapter || null,
+        sortIndex: row.sortIndex || 0
+      });
+    }
+    return map;
+  }
+
   public updateAnnotationMeta(
     uuid: string,
     updates: {
@@ -247,6 +277,25 @@ export class UserVaultDb {
       SELECT tag_name as tag FROM annotation_tags WHERE annotation_uuid = ? ORDER BY created_at ASC, rowid ASC
     `).all(uuid) as { tag: string }[];
     return rows.map(r => r.tag);
+  }
+
+  public getAllTagsGrouped(): Map<string, string[]> {
+    const rows = this.db.prepare(`
+      SELECT annotation_uuid as uuid, tag_name as tag
+      FROM annotation_tags
+      ORDER BY created_at ASC, rowid ASC
+    `).all() as { uuid: string; tag: string }[];
+
+    const map = new Map<string, string[]>();
+    for (const r of rows) {
+      let list = map.get(r.uuid);
+      if (!list) {
+        list = [];
+        map.set(r.uuid, list);
+      }
+      list.push(r.tag);
+    }
+    return map;
   }
 
   public getAllTags(): string[] {

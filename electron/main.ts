@@ -57,9 +57,13 @@ function registerIpcHandlers() {
     const bookMap = new Map(books.map(b => [b.assetId, b]));
     const targetBook = assetId ? bookMap.get(assetId) : null;
 
+    // 批量加载用户元数据与标签，杜绝 N+1 次查询瓶颈
+    const allMetas = vault.getAllAnnotationMetas();
+    const allTags = vault.getAllTagsGrouped();
+
     const result: AnnotationItem[] = rawList.map(item => {
-      const meta = vault.getAnnotationMeta(item.uuid);
-      const tags = vault.getTagsForAnnotation(item.uuid);
+      const meta = allMetas.get(item.uuid);
+      const tags = allTags.get(item.uuid) || [];
       const book = targetBook || bookMap.get(item.assetId);
 
       // 若未解析过章节，尝试通过 EPUB 解析
@@ -102,9 +106,10 @@ function registerIpcHandlers() {
 
     // 1. 获取本地已解析高亮中所有章节与数量
     const annotations = syncer.extractAnnotations(assetId);
+    const allMetas = vault.getAllAnnotationMetas();
     const annoChapterMap: Record<string, number> = {};
     for (const a of annotations) {
-      const meta = vault.getAnnotationMeta(a.uuid);
+      const meta = allMetas.get(a.uuid);
       const ch = meta?.resolvedChapter || a.chapterTitle || '默认章节';
       annoChapterMap[ch] = (annoChapterMap[ch] || 0) + 1;
     }
@@ -146,10 +151,14 @@ function registerIpcHandlers() {
     const books = syncer.extractBooks();
     const bookMap = new Map(books.map(b => [b.assetId, b]));
 
+    // 批量加载用户元数据与标签，避免搜索全库成千上万条记录时出现 N+1 查询瓶颈
+    const allMetas = vault.getAllAnnotationMetas();
+    const allTags = vault.getAllTagsGrouped();
+
     const result: AnnotationItem[] = [];
     for (const item of all) {
-      const meta = vault.getAnnotationMeta(item.uuid);
-      const tags = vault.getTagsForAnnotation(item.uuid);
+      const meta = allMetas.get(item.uuid);
+      const tags = allTags.get(item.uuid) || [];
       const book = bookMap.get(item.assetId);
       const bookTitle = book?.title || '未知书籍';
       const chapterTitle = meta?.resolvedChapter || item.chapterTitle || '默认章节';
@@ -267,11 +276,11 @@ function registerIpcHandlers() {
     if (epubPath && typeof epubPath === 'string' && fs.existsSync(epubPath)) {
       const lower = epubPath.toLowerCase();
       const isValidExtension = lower.endsWith('.epub') || lower.endsWith('.ibooks');
+      const resolved = path.resolve(epubPath);
       const isInBooksFolder =
-        epubPath.includes('/Containers/com.apple.BKAgentService/') ||
-        epubPath.includes('/Containers/com.apple.iBooksX/') ||
-        epubPath.includes('/Library/Books/') ||
-        epubPath.includes('/Books/');
+        resolved.includes('/Containers/com.apple.BKAgentService/') ||
+        resolved.includes('/Containers/com.apple.iBooksX/') ||
+        resolved.includes('/Library/Books/');
 
       if (isValidExtension || isInBooksFolder) {
         await shell.openPath(epubPath);
@@ -304,13 +313,56 @@ function registerIpcHandlers() {
 
   ipcMain.handle('export:markdown', async (_, assetId: string, format: 'standard' | 'obsidian') => {
     if (!mainWindow) return { success: false };
+
+    // 支持全书库批注与星标聚合导出
+    if (assetId === '__STARRED_NOTES__') {
+      const allAnnos = syncer.extractAnnotations();
+      const books = syncer.extractBooks();
+      const bookMap = new Map(books.map(b => [b.assetId, b]));
+      const allMetas = vault.getAllAnnotationMetas();
+      const allTags = vault.getAllTagsGrouped();
+
+      const starredList: AnnotationItem[] = allAnnos
+        .map(item => {
+          const meta = allMetas.get(item.uuid);
+          const tags = allTags.get(item.uuid) || [];
+          const b = bookMap.get(item.assetId);
+          return {
+            ...item,
+            bookTitle: b?.title || '未知书籍',
+            author: b?.author || null,
+            customNote: meta?.customNote || '',
+            isStarred: meta?.isStarred || false,
+            tags
+          };
+        })
+        .filter(a => a.isStarred || Boolean(a.note?.trim() || a.customNote?.trim()));
+
+      const content = MarkdownExporter.formatCollectionMarkdown('全书库精选批注与星标', starredList, format);
+
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: '导出全书库精选批注与星标 Markdown',
+        defaultPath: '全书库精选批注与星标_笔记.md',
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      });
+
+      if (!result.canceled && result.filePath) {
+        fs.writeFileSync(result.filePath, content, 'utf-8');
+        return { success: true, filePath: result.filePath };
+      }
+      return { success: false };
+    }
+
     const books = syncer.extractBooks();
     const book = books.find(b => b.assetId === assetId);
     if (!book) return { success: false };
 
+    const allMetas = vault.getAllAnnotationMetas();
+    const allTags = vault.getAllTagsGrouped();
+
     const annotations: AnnotationItem[] = syncer.extractAnnotations(assetId).map(item => {
-      const meta = vault.getAnnotationMeta(item.uuid);
-      const tags = vault.getTagsForAnnotation(item.uuid);
+      const meta = allMetas.get(item.uuid);
+      const tags = allTags.get(item.uuid) || [];
       const chapterTitle = meta?.resolvedChapter || item.chapterTitle;
       const sortIndex = meta?.sortIndex ?? item.sortIndex;
       return {
@@ -354,6 +406,14 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true
     }
+  });
+
+  // 拦截非预期弹窗，通过系统浏览器安全打开外链
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:') || url.startsWith('ibooks:')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
