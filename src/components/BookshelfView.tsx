@@ -199,47 +199,47 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-paper-bg dark:bg-night-bg text-paper-text dark:text-night-text">
       {/* 顶部统计横幅 */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4">
-        <div>
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between pb-6 border-b border-paper-border dark:border-night-border mb-8 gap-4">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text">我的书库</h2>
+            <h2 className="text-3xl font-serif font-bold text-paper-text dark:text-night-text whitespace-nowrap">我的书库</h2>
             {/* 书架范围快捷筛选胶囊 */}
-            <div className="flex items-center bg-paper-drawer dark:bg-night-drawer p-0.5 rounded-lg border border-paper-border/60 dark:border-night-border text-xs">
+            <div className="flex flex-wrap items-center bg-paper-drawer dark:bg-night-drawer p-0.5 rounded-lg border border-paper-border/60 dark:border-night-border text-xs">
               <button
                 data-testid="filter-all-books"
                 onClick={() => setFilterMode('all')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
                   filterMode === 'all'
                     ? 'bg-white dark:bg-night-card font-medium text-paper-text dark:text-night-text shadow-xs'
                     : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                 }`}
               >
-                <Library className="w-3.5 h-3.5" />
+                <Library className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>全部藏书 ({visibleShelfBooks.length})</span>
               </button>
               <button
                 data-testid="filter-notes-books"
                 onClick={() => setFilterMode('has_notes')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
                   filterMode === 'has_notes'
                     ? 'bg-white dark:bg-night-card font-medium text-paper-text dark:text-night-text shadow-xs'
                     : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                 }`}
               >
-                <Highlighter className="w-3.5 h-3.5 text-amber-500" />
+                <Highlighter className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                 <span>有笔记的书 ({booksWithNotes.length})</span>
               </button>
               {onTogglePinBook && (
                 <button
                   data-testid="filter-pinned-books"
                   onClick={() => setFilterMode('pinned')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
                     filterMode === 'pinned'
                       ? 'bg-white dark:bg-night-card font-medium text-paper-text dark:text-night-text shadow-xs'
                       : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                   }`}
                 >
-                  <Bookmark className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta" />
+                  <Bookmark className="w-3.5 h-3.5 text-paper-terracotta dark:text-night-terracotta flex-shrink-0" />
                   <span>重点书单 ({pinnedBooks.length})</span>
                 </button>
               )}
@@ -250,14 +250,14 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
                 type="button"
                 data-testid="manage-bookshelf-btn"
                 onClick={() => setIsVisibilityModalOpen(true)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors whitespace-nowrap flex-shrink-0 ${
                   hiddenCount > 0
                     ? 'border-paper-terracotta/50 bg-paper-terracotta/10 text-paper-terracotta dark:text-night-terracotta font-medium'
                     : 'border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text'
                 }`}
                 title="自由选择哪些书籍展示在当前书架"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <SlidersHorizontal className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{hiddenCount > 0 ? `管理书架 (已隐藏 ${hiddenCount} 本)` : '管理书架'}</span>
               </button>
             )}
@@ -270,12 +270,12 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
         </div>
 
         {/* 排序切换 */}
-        <div className="flex items-center gap-2 text-xs text-paper-muted dark:text-night-muted">
-          <ArrowUpDown className="w-3.5 h-3.5" />
-          <span>排序方式:</span>
+        <div className="flex items-center gap-2 text-xs text-paper-muted dark:text-night-muted flex-shrink-0 whitespace-nowrap">
+          <ArrowUpDown className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="whitespace-nowrap flex-shrink-0">排序方式:</span>
           <button
             onClick={() => setSortBy('recent')}
-            className={`px-2.5 py-1 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded transition-colors whitespace-nowrap flex-shrink-0 ${
               sortBy === 'recent'
                 ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
                 : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
@@ -285,7 +285,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
           </button>
           <button
             onClick={() => setSortBy('highlights')}
-            className={`px-2.5 py-1 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded transition-colors whitespace-nowrap flex-shrink-0 ${
               sortBy === 'highlights'
                 ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
                 : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
@@ -295,7 +295,7 @@ export const BookshelfView: React.FC<BookshelfViewProps> = ({
           </button>
           <button
             onClick={() => setSortBy('title')}
-            className={`px-2.5 py-1 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded transition-colors whitespace-nowrap flex-shrink-0 ${
               sortBy === 'title'
                 ? 'bg-white dark:bg-night-card text-paper-text dark:text-night-text font-medium shadow-sm border border-paper-border/60 dark:border-night-border'
                 : 'hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'

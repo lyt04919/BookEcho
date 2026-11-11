@@ -255,6 +255,15 @@ describe('BookshelfView Component', () => {
     expect(html).toContain('当前已隐藏全部藏书');
     expect(html).toContain('选择要展示的书籍');
   });
+
+  it('should prevent line wrapping on sort bar controls', () => {
+    const html = renderToStaticMarkup(<BookshelfView {...defaultProps} />);
+    expect(html).toContain('flex-shrink-0 whitespace-nowrap');
+    expect(html).toContain('排序方式:');
+    expect(html).toContain('最近阅读');
+    expect(html).toContain('笔记数量');
+    expect(html).toContain('书名');
+  });
 });
 
 describe('App Integration with BookshelfView', () => {
