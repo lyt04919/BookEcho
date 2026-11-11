@@ -154,10 +154,18 @@ describe('HighlightCard Component', () => {
     expect(html).toContain('aria-label="生成金句卡片"');
   });
 
-  it('should render collapsible context trigger button', () => {
+  it('should render standardized card height and flex layout for uniform grid cards', () => {
+    const props = createDefaultProps();
+    const html = renderToStaticMarkup(<HighlightCard {...props} />);
+    expect(html).toContain('h-[264px]');
+    expect(html).toContain('flex flex-col justify-between');
+  });
+
+  it('should render collapsible context trigger button and context modal trigger', () => {
     const props = createDefaultProps();
     const html = renderToStaticMarkup(<HighlightCard {...props} />);
     expect(html).toContain('展开原文语境');
+    expect(html).toContain('居中窗口查看前后原文语境');
   });
 
   it('should support dark mode tokens for night mode styling', () => {
