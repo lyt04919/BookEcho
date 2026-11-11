@@ -874,8 +874,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
 
       {/* 4. 右侧抽屉：展示当前选中聚焦节点及其所有相连高亮卡片 */}
       {focusedNodeInfo && (
-        <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[420px] bg-paper-card dark:bg-night-card border-l border-paper-border dark:border-night-border shadow-2xl flex flex-col z-30 animate-in slide-in-from-right duration-200">
-          <div className="p-4 border-b border-paper-border dark:border-night-border flex items-start justify-between gap-3">
+        <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[420px] bg-paper-card dark:bg-night-card border-l border-paper-border dark:border-night-border shadow-2xl flex flex-col z-40 app-no-drag animate-in slide-in-from-right duration-200">
+          <div className="px-4 pt-7 pb-4 border-b border-paper-border dark:border-night-border flex items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded text-xs font-semibold bg-paper-terracotta/10 text-paper-terracotta dark:text-night-terracotta">

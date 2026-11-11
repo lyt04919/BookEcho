@@ -322,7 +322,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        {onToggleDemoMode && (
+        {onToggleDemoMode && (!onOpenSettings || isDemoMode) && (
           <button
             onClick={onToggleDemoMode}
             className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs transition-colors ${
@@ -344,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        {onOpenColorSettings && (
+        {onOpenColorSettings && !onOpenSettings && (
           <button
             onClick={onOpenColorSettings}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors"
@@ -355,14 +355,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        <button
-          onClick={onSelectCustomDir}
-          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          title="切换数据源路径"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span>切换数据目录</span>
-        </button>
+        {!onOpenSettings && (
+          <button
+            onClick={onSelectCustomDir}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            title="切换数据源路径"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span>切换数据目录</span>
+          </button>
+        )}
 
         {onOpenSettings && (
           <button

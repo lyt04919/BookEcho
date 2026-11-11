@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Palette,
@@ -9,12 +9,13 @@ import {
   FileText,
   Info,
   ExternalLink,
+  Copy,
   Check,
   HardDrive,
   Sun,
   Moon
 } from 'lucide-react';
-import { ColorSemanticConfig, HighlightColor } from '../../electron/types/ipc';
+import { AnnotationItem, ColorSemanticConfig, HighlightColor } from '../../electron/types/ipc';
 import { DEFAULT_COLOR_SEMANTICS, SEMANTIC_PRESETS } from './ColorSemanticsModal';
 
 export type SettingsTabId = 'general' | 'highlights' | 'storage' | 'export' | 'about';
@@ -27,6 +28,9 @@ export interface SettingsModalProps {
   onToggleDarkMode: () => void;
   colorSemantics: ColorSemanticConfig[];
   onSaveColorSemantics: (updated: ColorSemanticConfig[]) => Promise<void> | void;
+  annotations?: AnnotationItem[];
+  booksCount?: number;
+  tagsCount?: number;
   customDataDir?: string | null;
   onSelectCustomDir: () => Promise<void> | void;
   onResetCustomDir?: () => Promise<void> | void;
@@ -53,6 +57,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleDarkMode,
   colorSemantics,
   onSaveColorSemantics,
+  annotations = [],
+  booksCount,
+  tagsCount,
   customDataDir = null,
   onSelectCustomDir,
   onResetCustomDir,
@@ -71,6 +78,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isColorSaved, setIsColorSaved] = useState(false);
   const [copiedGithub, setCopiedGithub] = useState(false);
 
+  const colorCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const a of annotations) {
+      counts[a.colorKey] = (counts[a.colorKey] || 0) + 1;
+    }
+    return counts;
+  }, [annotations]);
+
+  const hasUnsavedColors = useMemo(() => {
+    return colorDraft.some(draftItem => {
+      const origin = colorSemantics.find(c => c.colorKey === draftItem.colorKey);
+      if (!origin) return true;
+      return origin.label !== draftItem.label || origin.hexColor !== draftItem.hexColor;
+    });
+  }, [colorDraft, colorSemantics]);
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
@@ -80,28 +103,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           return existing ? { ...existing } : { ...def };
         })
       );
+      setIsColorSaved(false);
     }
   }, [isOpen, initialTab, colorSemantics]);
 
   // 支持按下 Escape 键关闭
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const handleUpdateLabel = (colorKey: HighlightColor, label: string) => {
     setColorDraft(prev => prev.map(c => (c.colorKey === colorKey ? { ...c, label } : c)));
+    setIsColorSaved(false);
   };
 
   const handleUpdateHex = (colorKey: HighlightColor, hexColor: string) => {
     setColorDraft(prev => prev.map(c => (c.colorKey === colorKey ? { ...c, hexColor } : c)));
+    setIsColorSaved(false);
   };
 
   const handleApplyPreset = (presetId: string) => {
@@ -113,16 +141,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         label: preset.labels[c.colorKey] || c.label
       }))
     );
+    setIsColorSaved(false);
   };
 
   const handleResetColors = () => {
     setColorDraft(DEFAULT_COLOR_SEMANTICS.map(c => ({ ...c })));
+    setIsColorSaved(false);
   };
 
   const handleSaveColors = async () => {
-    await onSaveColorSemantics(colorDraft);
+    const sanitized = colorDraft.map(item => {
+      const def = DEFAULT_COLOR_SEMANTICS.find(d => d.colorKey === item.colorKey)!;
+      return {
+        ...item,
+        label: item.label.trim() || def.label,
+        hexColor: /^#[0-9a-fA-F]{6}$/.test(item.hexColor) ? item.hexColor : def.hexColor
+      };
+    });
+    setColorDraft(sanitized);
+    await onSaveColorSemantics(sanitized);
     setIsColorSaved(true);
     setTimeout(() => setIsColorSaved(false), 1800);
+  };
+
+  const handleOpenGithub = () => {
+    window.open('https://github.com/lyt04919/BookEcho', '_blank', 'noopener,noreferrer');
   };
 
   const handleCopyGithub = () => {
@@ -136,12 +179,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   return (
     <div
       data-testid="settings-modal"
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4 app-no-drag"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[580px] max-h-[90vh]">
+      <div
+        className="bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[580px] max-h-[90vh] app-no-drag"
+        onClick={e => e.stopPropagation()}
+      >
         {/* 左侧垂直 Tab 栏 */}
         <aside className="w-full md:w-52 bg-paper-drawer dark:bg-night-drawer border-b md:border-b-0 md:border-r border-paper-border dark:border-night-border p-4 flex flex-col justify-between flex-shrink-0">
           <div className="space-y-1">
@@ -151,6 +197,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={() => setActiveTab('general')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'general'
@@ -163,18 +210,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('highlights')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'highlights'
                   ? 'bg-white dark:bg-night-card text-paper-terracotta dark:text-night-terracotta shadow-2xs'
                   : 'text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
-              <Palette className="w-4 h-4" />
-              <span>高亮色彩语义</span>
+              <span className="flex items-center gap-2.5">
+                <Palette className="w-4 h-4" />
+                <span>高亮色彩语义</span>
+              </span>
+              {hasUnsavedColors && (
+                <span className="w-1.5 h-1.5 rounded-full bg-paper-terracotta dark:bg-night-terracotta" title="有未保存的改动" />
+              )}
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('storage')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'storage'
@@ -187,6 +241,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('export')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'export'
@@ -199,6 +254,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('about')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'about'
@@ -219,7 +275,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* 右侧设置详情面板 */}
         <section className="flex-1 flex flex-col min-w-0 bg-paper-card dark:bg-night-card overflow-hidden">
           {/* 顶栏 */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-paper-border dark:border-night-border flex-shrink-0">
+          <div className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-paper-border dark:border-night-border flex-shrink-0 app-no-drag">
             <h2 className="font-serif text-base font-bold text-paper-text dark:text-night-text">
               {activeTab === 'general' && '外观与偏好'}
               {activeTab === 'highlights' && '高亮色彩语义配置'}
@@ -228,9 +284,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {activeTab === 'about' && '关于 BookEcho'}
             </h2>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors"
+              className="p-2 -mr-1.5 rounded-lg text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-text dark:hover:text-night-text transition-colors cursor-pointer app-no-drag"
               aria-label="关闭设置面板"
+              title="关闭 (Esc)"
             >
               <X className="w-4 h-4" />
             </button>
@@ -247,16 +305,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </label>
                   <div className="grid grid-cols-2 gap-3 max-w-md">
                     <button
+                      type="button"
                       onClick={() => {
                         if (isDarkMode) onToggleDarkMode();
                       }}
-                      className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left cursor-pointer ${
                         !isDarkMode
                           ? 'border-paper-terracotta bg-paper-terracotta/5 text-paper-text shadow-xs'
                           : 'border-paper-border dark:border-night-border hover:bg-black/5 dark:hover:bg-white/5 text-paper-muted'
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 flex-shrink-0">
                         <Sun className="w-4 h-4" />
                       </div>
                       <div>
@@ -266,16 +325,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
 
                     <button
+                      type="button"
                       onClick={() => {
                         if (!isDarkMode) onToggleDarkMode();
                       }}
-                      className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left ${
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left cursor-pointer ${
                         isDarkMode
                           ? 'border-night-terracotta bg-night-terracotta/10 text-night-text shadow-xs'
                           : 'border-paper-border dark:border-night-border hover:bg-black/5 dark:hover:bg-white/5 text-paper-muted'
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400">
+                      <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400 flex-shrink-0">
                         <Moon className="w-4 h-4" />
                       </div>
                       <div>
@@ -291,14 +351,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     快捷键指引
                   </label>
                   <div className="space-y-2 max-w-md text-xs text-paper-muted dark:text-night-muted">
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-paper-drawer dark:bg-night-drawer">
-                      <span>打开偏好设置</span>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-paper-drawer dark:bg-night-drawer">
+                      <span>打开 / 关闭偏好设置</span>
                       <kbd className="px-2 py-0.5 rounded bg-white dark:bg-night-card border border-paper-border dark:border-night-border font-mono text-[11px]">
                         ⌘ ,
                       </kbd>
                     </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-paper-drawer dark:bg-night-drawer">
-                      <span>关闭当前弹窗</span>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-paper-drawer dark:bg-night-drawer">
+                      <span>全局探索与检索</span>
+                      <kbd className="px-2 py-0.5 rounded bg-white dark:bg-night-card border border-paper-border dark:border-night-border font-mono text-[11px]">
+                        ⌘ K
+                      </kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-paper-drawer dark:bg-night-drawer">
+                      <span>关闭弹窗 / 返回上一级</span>
                       <kbd className="px-2 py-0.5 rounded bg-white dark:bg-night-card border border-paper-border dark:border-night-border font-mono text-[11px]">
                         Esc
                       </kbd>
@@ -315,12 +381,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <p className="text-xs text-paper-muted dark:text-night-muted">
                     为 Apple Books 中的划线色彩赋予思考维度标签与色彩映射：
                   </p>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {SEMANTIC_PRESETS.map(preset => (
                       <button
+                        type="button"
                         key={preset.id}
                         onClick={() => handleApplyPreset(preset.id)}
-                        className="px-2.5 py-1 text-[11px] rounded-md bg-paper-drawer dark:bg-night-drawer hover:bg-paper-terracotta/10 hover:text-paper-terracotta text-paper-muted dark:text-night-muted transition-colors"
+                        className="px-2.5 py-1 text-[11px] rounded-md bg-paper-drawer dark:bg-night-drawer hover:bg-paper-terracotta/10 hover:text-paper-terracotta text-paper-muted dark:text-night-muted transition-colors cursor-pointer"
                         title={preset.description}
                       >
                         {preset.name}
@@ -332,6 +399,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="space-y-2.5">
                   {colorDraft.map(item => {
                     const meta = COLOR_NATIVE_META[item.colorKey];
+                    const count = colorCounts[item.colorKey] || 0;
                     return (
                       <div
                         key={item.colorKey}
@@ -341,12 +409,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           className="w-4 h-4 rounded-full flex-shrink-0 shadow-xs border border-black/10"
                           style={{ backgroundColor: item.hexColor }}
                         />
-                        <div className="w-24 flex-shrink-0">
+                        <div className="w-28 flex-shrink-0">
                           <span className="text-xs font-semibold text-paper-text dark:text-night-text block">
                             {meta?.nativeName || item.colorKey}
                           </span>
                           <span className="text-[10px] text-paper-muted dark:text-night-muted">
-                            {item.colorKey}
+                            {annotations.length > 0 ? `${count} 条高亮` : item.colorKey}
                           </span>
                         </div>
                         <input
@@ -354,7 +422,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={item.label}
                           onChange={e => handleUpdateLabel(item.colorKey, e.target.value)}
                           placeholder="输入含义标签..."
-                          className="flex-1 px-2.5 py-1 rounded-md text-xs border border-paper-border dark:border-night-border bg-white dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta"
+                          className="flex-1 min-w-0 px-2.5 py-1 rounded-md text-xs border border-paper-border dark:border-night-border bg-white dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta"
                         />
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <input
@@ -375,19 +443,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div className="flex items-center justify-between pt-2">
                   <button
+                    type="button"
                     onClick={handleResetColors}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-paper-muted hover:text-paper-text dark:hover:text-night-text transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-paper-muted hover:text-paper-text dark:hover:text-night-text transition-colors cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>恢复默认预设</span>
                   </button>
-                  <button
-                    onClick={handleSaveColors}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-all"
-                  >
-                    {isColorSaved ? <Check className="w-3.5 h-3.5" /> : null}
-                    <span>{isColorSaved ? '保存成功' : '应用色彩设置'}</span>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {hasUnsavedColors && !isColorSaved && (
+                      <span className="text-[11px] text-paper-terracotta dark:text-night-terracotta">
+                        有未保存的改动
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSaveColors}
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-all cursor-pointer"
+                    >
+                      {isColorSaved ? <Check className="w-3.5 h-3.5" /> : null}
+                      <span>{isColorSaved ? '保存成功' : '应用色彩设置'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -402,33 +479,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <p className="text-xs text-paper-muted dark:text-night-muted mb-3 leading-relaxed">
                     BookEcho 默认以只读安全方式从 macOS 系统原生的 Apple Books Containers 提取划线与书籍元数据。
                   </p>
-                  <div className="p-3 rounded-xl border border-paper-border dark:border-night-border bg-paper-drawer dark:bg-night-drawer space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-paper-muted dark:text-night-muted truncate max-w-sm">
+                  <div className="p-3.5 rounded-xl border border-paper-border dark:border-night-border bg-paper-drawer dark:bg-night-drawer space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className="text-[11px] font-mono text-paper-muted dark:text-night-muted truncate"
+                        title={customDataDir || '~/Library/Containers/com.apple.iBooksX/Data/Documents/'}
+                      >
                         {customDataDir || '系统默认：~/Library/Containers/com.apple.iBooksX/...'}
                       </span>
                       {customDataDir ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium flex-shrink-0">
                           自定义备份
                         </span>
                       ) : (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium flex-shrink-0">
                           系统原生默认
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={onSelectCustomDir}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-night-card border border-paper-border dark:border-night-border text-xs text-paper-text dark:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-night-card border border-paper-border dark:border-night-border text-xs text-paper-text dark:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                       >
                         <FolderOpen className="w-3.5 h-3.5" />
                         <span>更换数据源目录</span>
                       </button>
                       {customDataDir && onResetCustomDir && (
                         <button
+                          type="button"
                           onClick={onResetCustomDir}
-                          className="px-3 py-1.5 rounded-lg text-xs text-paper-muted hover:text-paper-terracotta transition-colors"
+                          className="px-3 py-1.5 rounded-lg text-xs text-paper-muted hover:text-paper-terracotta transition-colors cursor-pointer"
                         >
                           恢复系统默认路径
                         </button>
@@ -436,6 +518,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {(booksCount !== undefined || annotations.length > 0) && (
+                  <div className="pt-4 border-t border-paper-border dark:border-night-border">
+                    <label className="text-xs font-semibold text-paper-text dark:text-night-text block mb-2">
+                      当前知识库概览
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 rounded-xl bg-paper-drawer dark:bg-night-drawer border border-paper-border/60 dark:border-night-border/60">
+                        <div className="text-[11px] text-paper-muted dark:text-night-muted">收录书籍</div>
+                        <div className="text-base font-serif font-bold text-paper-text dark:text-night-text mt-0.5">
+                          {booksCount ?? '-'} 本
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-paper-drawer dark:bg-night-drawer border border-paper-border/60 dark:border-night-border/60">
+                        <div className="text-[11px] text-paper-muted dark:text-night-muted">累计高亮</div>
+                        <div className="text-base font-serif font-bold text-paper-text dark:text-night-text mt-0.5">
+                          {annotations.length} 条
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-paper-drawer dark:bg-night-drawer border border-paper-border/60 dark:border-night-border/60">
+                        <div className="text-[11px] text-paper-muted dark:text-night-muted">概念标签</div>
+                        <div className="text-base font-serif font-bold text-paper-text dark:text-night-text mt-0.5">
+                          {tagsCount ?? 0} 个
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {onToggleDemoMode && (
                   <div className="pt-4 border-t border-paper-border dark:border-night-border">
@@ -453,11 +563,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </span>
                       </div>
                       <button
+                        type="button"
                         onClick={onToggleDemoMode}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                           isDemoMode
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-paper-terracotta dark:bg-night-terracotta text-white'
+                            ? 'bg-amber-500 text-white hover:opacity-95'
+                            : 'bg-paper-terracotta dark:bg-night-terracotta text-white hover:opacity-95'
                         }`}
                       >
                         {isDemoMode ? '切回原生真实数据' : '载入体验数据'}
@@ -483,7 +594,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
                         exportFormat === 'obsidian'
                           ? 'border-paper-terracotta bg-paper-terracotta/5'
-                          : 'border-paper-border dark:border-night-border'
+                          : 'border-paper-border dark:border-night-border hover:bg-black/5 dark:hover:bg-white/5'
                       }`}
                     >
                       <input
@@ -497,8 +608,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div className="text-xs font-semibold text-paper-text dark:text-night-text">
                           Obsidian 增强格式（推荐）
                         </div>
-                        <div className="text-[11px] text-paper-muted dark:text-night-muted mt-0.5">
-                          采用 `&gt; [!quote]` Callout 块引用卡片，天然兼容 Obsidian、Logseq、Notion
+                        <div className="text-[11px] text-paper-muted dark:text-night-muted mt-1 leading-relaxed">
+                          采用 <code className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/10 font-mono text-[10px]">&gt; [!quote]</code> Callout 块引用卡片，天然兼容 Obsidian、Logseq、Notion
                         </div>
                       </div>
                     </label>
@@ -507,7 +618,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
                         exportFormat === 'standard'
                           ? 'border-paper-terracotta bg-paper-terracotta/5'
-                          : 'border-paper-border dark:border-night-border'
+                          : 'border-paper-border dark:border-night-border hover:bg-black/5 dark:hover:bg-white/5'
                       }`}
                     >
                       <input
@@ -521,8 +632,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div className="text-xs font-semibold text-paper-text dark:text-night-text">
                           标准 Markdown 引用格式
                         </div>
-                        <div className="text-[11px] text-paper-muted dark:text-night-muted mt-0.5">
-                          采用通用的 `&gt; ` 标准引用语法，可在任何基础 Markdown 编辑器中无差别渲染
+                        <div className="text-[11px] text-paper-muted dark:text-night-muted mt-1 leading-relaxed">
+                          采用通用的 <code className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/10 font-mono text-[10px]">&gt; </code> 标准引用语法，可在任何基础 Markdown 编辑器中无差别渲染
                         </div>
                       </div>
                     </label>
@@ -560,11 +671,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div className="pt-2 flex items-center gap-3">
                   <button
-                    onClick={handleCopyGithub}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-white dark:bg-night-card text-xs text-paper-text dark:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    type="button"
+                    onClick={handleOpenGithub}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-paper-terracotta dark:bg-night-terracotta text-white text-xs font-medium shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>{copiedGithub ? '已复制仓库链接' : 'GitHub 仓库'}</span>
+                    <span>打开 GitHub 仓库</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyGithub}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-white dark:bg-night-card text-xs text-paper-text dark:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    {copiedGithub ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedGithub ? '已复制仓库链接' : '复制地址'}</span>
                   </button>
                 </div>
               </div>

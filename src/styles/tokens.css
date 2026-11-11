@@ -25,6 +25,7 @@ body {
 }
 
 .app-no-drag,
+.app-no-drag *,
 .app-drag button,
 .app-drag a,
 .app-drag input,

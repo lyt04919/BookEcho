@@ -170,7 +170,7 @@ export default function App() {
       } else if (e.key === 'Escape') {
         const target = e.target as { tagName?: string } | null;
         if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
-        if (activeQuoteItem || exportBookAssetId) return;
+        if (activeQuoteItem || exportBookAssetId || isSettingsOpen || isColorSettingsOpen) return;
         if (readingChapterContent) {
           setReadingChapterContent(null);
         } else if (selectedTag) {
@@ -187,7 +187,7 @@ export default function App() {
       window.addEventListener('keydown', handleGlobalKeyDown);
       return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }
-  }, [activeQuoteItem, exportBookAssetId, readingChapterContent, selectedTag, selectedBook]);
+  }, [activeQuoteItem, exportBookAssetId, isSettingsOpen, isColorSettingsOpen, readingChapterContent, selectedTag, selectedBook]);
 
   // 切换单书精读
   const handleSelectBook = async (book: BookItem) => {
@@ -751,7 +751,7 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* 演示测试数据专属顶部提示横幅 */}
         {isDemoMode && (
-          <div className="flex items-center justify-between px-4 pt-6 pb-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 z-20 app-drag">
+          <div className="flex items-center justify-between px-4 pt-6 pb-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 z-30 app-drag">
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               <span>
@@ -759,12 +759,13 @@ export default function App() {
               </span>
             </div>
             <button
+              type="button"
               onClick={() => {
                 setIsDemoMode(false);
                 setSelectedBook(null);
                 setSelectedTag(null);
               }}
-              className="flex items-center gap-1 font-medium hover:underline text-amber-800 dark:text-amber-200 ml-4 flex-shrink-0"
+              className="relative z-30 app-no-drag flex items-center gap-1 font-medium hover:underline text-amber-800 dark:text-amber-200 ml-4 flex-shrink-0 cursor-pointer"
             >
               <span>切回原生书库</span>
               <X className="w-3.5 h-3.5" />
@@ -1045,6 +1046,9 @@ export default function App() {
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
         colorSemantics={colorSemantics}
         onSaveColorSemantics={handleSaveColorSemantics}
+        annotations={activeAnnotations}
+        booksCount={activeBooks.length}
+        tagsCount={activeTags.length}
         customDataDir={customDataDir}
         onSelectCustomDir={handleSelectCustomDir}
         onResetCustomDir={handleResetCustomDir}
@@ -1071,12 +1075,14 @@ export default function App() {
         />
       )}
 
-      {/* 全局窗口顶部无边框拖拽条（避开左上角红绿灯） */}
-      <div
-        className="fixed top-0 left-20 right-0 h-6 z-30 app-drag"
-        aria-hidden="true"
-        data-testid="window-drag-region"
-      />
+      {/* 全局窗口顶部无边框拖拽条（避开左上角红绿灯；弹窗打开时自动退避避免拦截关闭按钮点击） */}
+      {!isSettingsOpen && !isColorSettingsOpen && !activeQuoteItem && !exportBookAssetId && (
+        <div
+          className="fixed top-0 left-20 right-0 h-6 z-20 app-drag"
+          aria-hidden="true"
+          data-testid="window-drag-region"
+        />
+      )}
     </div>
   );
 }

@@ -26,9 +26,11 @@ describe('SettingsModal Component', () => {
     expect(html).toBe('');
   });
 
-  it('should render modal dialog with tabs when isOpen is true', () => {
+  it('should render modal dialog with tabs and app-no-drag close button when isOpen is true', () => {
     const html = renderToStaticMarkup(<SettingsModal {...defaultProps} />);
     expect(html).toContain('data-testid="settings-modal"');
+    expect(html).toContain('app-no-drag');
+    expect(html).toContain('aria-label="关闭设置面板"');
     expect(html).toContain('偏好设置');
     expect(html).toContain('外观与偏好');
     expect(html).toContain('高亮色彩语义');
@@ -81,11 +83,21 @@ describe('SettingsModal Component', () => {
     expect(html).toContain('标准 Markdown 引用格式');
   });
 
-  it('should render about tab with app version and local-first assurance', () => {
+  it('should render about tab with app version, local-first assurance, and github actions', () => {
     const html = renderToStaticMarkup(<SettingsModal {...defaultProps} initialTab="about" />);
     expect(html).toContain('BookEcho');
     expect(html).toContain('v1.0.0');
     expect(html).toContain('本地优先与隐私安全（Local-first）');
-    expect(html).toContain('GitHub 仓库');
+    expect(html).toContain('打开 GitHub 仓库');
+    expect(html).toContain('复制地址');
+  });
+
+  it('should render library overview stats in storage tab when counts are provided', () => {
+    const html = renderToStaticMarkup(
+      <SettingsModal {...defaultProps} initialTab="storage" booksCount={12} tagsCount={8} />
+    );
+    expect(html).toContain('当前知识库概览');
+    expect(html).toContain('12 本');
+    expect(html).toContain('8 个');
   });
 });

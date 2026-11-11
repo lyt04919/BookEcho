@@ -265,7 +265,7 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   // 居中原文语境弹窗组件内容
   const contextModalContent = isContextModalOpen && (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150 app-no-drag"
       onClick={() => setIsContextModalOpen(false)}
       role="dialog"
       aria-modal="true"

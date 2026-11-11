@@ -222,6 +222,6 @@ describe('App Integration with Sidebar', () => {
     expect(html).toContain('BookEcho');
     expect(html).toContain('全部书架');
     expect(html).toContain('我的书库');
-    expect(html).toContain('颜色语义配置');
+    expect(html).toContain('偏好设置');
   });
 });
