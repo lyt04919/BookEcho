@@ -79,7 +79,7 @@ export interface BookEchoAPI {
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) => Promise<HighlightContextResult>;
 
   // 用户扩展操作
-  updateAnnotationMeta: (uuid: string, updates: { customNote?: string; isStarred?: boolean }) => Promise<void>;
+  updateAnnotationMeta: (uuid: string, updates: { customNote?: string; isStarred?: boolean; resolvedChapter?: string }) => Promise<void>;
   addTag: (uuid: string, tag: string) => Promise<void>;
   removeTag: (uuid: string, tag: string) => Promise<void>;
   getAllTags: () => Promise<string[]>;
@@ -93,7 +93,7 @@ export interface BookEchoAPI {
 
   // 色彩配置与系统
   getColorSemantics: () => Promise<ColorSemanticConfig[]>;
-  updateColorSemantic: (colorKey: HighlightColor, label: string) => Promise<void>;
+  updateColorSemantic: (colorKey: HighlightColor, label: string, hexColor?: string) => Promise<void>;
   openInAppleBooks: (assetId: string, epubPath?: string | null) => Promise<boolean>;
   openSystemPrivacySettings: () => Promise<boolean>;
   selectCustomDataDir: () => Promise<string | null>;

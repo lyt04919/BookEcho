@@ -12,7 +12,8 @@ import {
   BarChart3,
   ArrowLeft,
   Waypoints,
-  Sparkles
+  Sparkles,
+  Palette
 } from 'lucide-react';
 import { ColorSemanticConfig, HighlightColor, BookItem } from '../../electron/types/ipc';
 
@@ -42,6 +43,7 @@ export interface SidebarProps {
   isRefreshing?: boolean;
   isDemoMode?: boolean;
   onToggleDemoMode?: () => void;
+  onOpenColorSettings?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -63,7 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRefreshData,
   isRefreshing = false,
   isDemoMode = false,
-  onToggleDemoMode
+  onToggleDemoMode,
+  onOpenColorSettings
 }) => {
   // 重点笔记书籍（划线数大于0的书籍，按笔记数倒序）
   const booksWithNotes = books
@@ -280,6 +283,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 DEMO
               </span>
             )}
+          </button>
+        )}
+
+        {onOpenColorSettings && (
+          <button
+            onClick={onOpenColorSettings}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-paper-muted dark:text-night-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors"
+            title="自定义不同高亮颜色代表的含义与配色"
+          >
+            <Palette className="w-3.5 h-3.5 text-paper-terracotta/80" />
+            <span>颜色语义配置</span>
           </button>
         )}
 

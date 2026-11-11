@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { AnnotationItem } from '../../electron/types/ipc';
 import { toPng } from 'html-to-image';
-import { X, Copy, Check, Download } from 'lucide-react';
+import { X, Copy, Check, Download, Edit2, RotateCcw } from 'lucide-react';
 
 export interface QuoteCardModalProps {
   annotation: AnnotationItem;
@@ -49,6 +49,20 @@ export const QuoteCardModal: React.FC<QuoteCardModalProps> = ({
   const [theme, setTheme] = useState<CardTheme>('classic');
   const [showNote, setShowNote] = useState(true);
   const [isCopied, setIsCopied] = useState(false);
+  const [isEditingContent, setIsEditingContent] = useState(false);
+  const [customQuote, setCustomQuote] = useState(annotation.selectedText);
+  const [customCardNote, setCustomCardNote] = useState(annotation.customNote || annotation.note || '');
+  const [customBookTitle, setCustomBookTitle] = useState(bookTitle);
+  const [customAuthor, setCustomAuthor] = useState(author || '未知作者');
+  const [customWatermark, setCustomWatermark] = useState('BookEcho');
+
+  const handleResetEdits = () => {
+    setCustomQuote(annotation.selectedText);
+    setCustomCardNote(annotation.customNote || annotation.note || '');
+    setCustomBookTitle(bookTitle);
+    setCustomAuthor(author || '未知作者');
+    setCustomWatermark('BookEcho');
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -116,7 +130,7 @@ export const QuoteCardModal: React.FC<QuoteCardModalProps> = ({
         </div>
 
         {/* 模版与选项栏 */}
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
             <span className="text-paper-muted dark:text-night-muted">主题模板:</span>
             {(['classic', 'swiss', 'obsidian', 'sage'] as CardTheme[]).map(t => (
@@ -134,16 +148,90 @@ export const QuoteCardModal: React.FC<QuoteCardModalProps> = ({
             ))}
           </div>
 
-          <label className="flex items-center gap-1.5 cursor-pointer text-paper-text dark:text-night-text">
-            <input
-              type="checkbox"
-              checked={showNote}
-              onChange={e => setShowNote(e.target.checked)}
-              className="rounded text-paper-terracotta dark:text-night-terracotta focus:ring-0"
-            />
-            <span>展示批注/思考</span>
-          </label>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 cursor-pointer text-paper-text dark:text-night-text">
+              <input
+                type="checkbox"
+                checked={showNote}
+                onChange={e => setShowNote(e.target.checked)}
+                className="rounded text-paper-terracotta dark:text-night-terracotta focus:ring-0"
+              />
+              <span>展示批注/思考</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setIsEditingContent(prev => !prev)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded transition-colors ${
+                isEditingContent
+                  ? 'bg-paper-terracotta/15 text-paper-terracotta dark:text-night-terracotta font-medium'
+                  : 'bg-paper-drawer dark:bg-night-drawer text-paper-muted hover:text-paper-text dark:hover:text-night-text'
+              }`}
+              title="制作金句图前可临时精修文字排版或自定义角标署名"
+            >
+              <Edit2 className="w-3 h-3" />
+              <span>{isEditingContent ? '收起文案微调' : '微调文案'}</span>
+            </button>
+          </div>
         </div>
+
+        {/* 卡片文案临时微调面板（仅作用于当前导出的高清金句图） */}
+        {isEditingContent && (
+          <div className="p-3.5 rounded-xl border border-paper-border dark:border-night-border bg-paper-sidebar/40 dark:bg-night-sidebar/40 space-y-2.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-paper-muted dark:text-night-muted">
+                自由微调金句卡片展示文案（不影响原始笔记）：
+              </span>
+              <button
+                type="button"
+                onClick={handleResetEdits}
+                className="flex items-center gap-1 text-[11px] text-paper-muted hover:text-paper-terracotta transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>还原</span>
+              </button>
+            </div>
+            <textarea
+              value={customQuote}
+              onChange={e => setCustomQuote(e.target.value)}
+              rows={2}
+              placeholder="输入或裁剪要渲染的金句正文..."
+              className="w-full p-2 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta resize-none"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="text"
+                value={customCardNote}
+                onChange={e => setCustomCardNote(e.target.value)}
+                placeholder="批注/感悟短评..."
+                className="px-2.5 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta"
+              />
+              <input
+                type="text"
+                value={customBookTitle}
+                onChange={e => setCustomBookTitle(e.target.value)}
+                placeholder="书籍标题..."
+                className="px-2.5 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta"
+              />
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={customAuthor}
+                  onChange={e => setCustomAuthor(e.target.value)}
+                  placeholder="作者"
+                  className="w-1/2 px-2 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta"
+                />
+                <input
+                  type="text"
+                  value={customWatermark}
+                  onChange={e => setCustomWatermark(e.target.value)}
+                  placeholder="角标"
+                  className="w-1/2 px-2 py-1.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 卡片预览生成容器 */}
         <div className="flex justify-center p-4 bg-paper-drawer/60 dark:bg-night-drawer/60 rounded-xl overflow-hidden">
@@ -154,26 +242,26 @@ export const QuoteCardModal: React.FC<QuoteCardModalProps> = ({
           >
             <div>
               <div className="text-2xl font-serif leading-none mb-4 opacity-30 select-none">“</div>
-              <blockquote className={`font-serif text-[17px] leading-relaxed tracking-wide ${currentTheme.text} mb-6`}>
-                {annotation.selectedText}
+              <blockquote className={`font-serif text-[17px] leading-relaxed tracking-wide ${currentTheme.text} mb-6 whitespace-pre-line`}>
+                {customQuote}
               </blockquote>
 
-              {showNote && (annotation.customNote || annotation.note) && (
+              {showNote && customCardNote.trim() && (
                 <div
                   data-testid="quote-card-note"
                   className={`p-3 rounded-lg bg-black/5 text-xs ${currentTheme.subText} mb-6 leading-normal`}
                 >
-                  {annotation.customNote || annotation.note}
+                  {customCardNote}
                 </div>
               )}
             </div>
 
             <div className={`pt-4 border-t ${currentTheme.border} flex items-center justify-between text-xs`}>
               <div>
-                <p className={`font-serif font-bold ${currentTheme.text}`}>{bookTitle}</p>
-                <p className={currentTheme.subText}>{author || '未知作者'}</p>
+                <p className={`font-serif font-bold ${currentTheme.text}`}>{customBookTitle}</p>
+                <p className={currentTheme.subText}>{customAuthor || '未知作者'}</p>
               </div>
-              <span className={`text-[10px] uppercase tracking-widest ${currentTheme.subText}`}>BookEcho</span>
+              <span className={`text-[10px] uppercase tracking-widest ${currentTheme.subText}`}>{customWatermark || 'BookEcho'}</span>
             </div>
           </div>
         </div>

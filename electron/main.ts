@@ -203,7 +203,7 @@ function registerIpcHandlers() {
     return epubEngine.extractParagraphContext(book.epubPath, locationCfi, selectedText);
   });
 
-  ipcMain.handle('meta:update', async (_, uuid: string, updates: { customNote?: string; isStarred?: boolean }) => {
+  ipcMain.handle('meta:update', async (_, uuid: string, updates: { customNote?: string; isStarred?: boolean; resolvedChapter?: string }) => {
     vault.updateAnnotationMeta(uuid, updates);
   });
 
@@ -250,6 +250,7 @@ function registerIpcHandlers() {
         const book = bookMap.get(item.assetId);
         return {
           ...item,
+          chapterTitle: meta?.resolvedChapter || item.chapterTitle,
           customNote: meta?.customNote || '',
           isStarred: meta?.isStarred || false,
           tags,
@@ -268,8 +269,8 @@ function registerIpcHandlers() {
     return vault.getColorSemantics();
   });
 
-  ipcMain.handle('semantics:update', async (_, colorKey: HighlightColor, label: string) => {
-    vault.updateColorSemantic(colorKey, label);
+  ipcMain.handle('semantics:update', async (_, colorKey: HighlightColor, label: string, hexColor?: string) => {
+    vault.updateColorSemantic(colorKey, label, hexColor);
   });
 
   ipcMain.handle('system:openAppleBooks', async (_, _assetId: string, epubPath?: string | null) => {

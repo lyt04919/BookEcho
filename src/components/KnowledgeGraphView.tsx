@@ -35,6 +35,8 @@ export interface KnowledgeGraphViewProps {
   availableTags: string[];
   onSelectBook: (book: BookItem) => void;
   onManageTags?: () => void;
+  onOpenColorSettings?: () => void;
+  onUpdateChapter?: (uuid: string, chapterTitle: string) => void;
   onCreateTag?: (tag: string) => void;
   onRenameTag?: (oldTag: string, newTag: string) => void;
   onDeleteTag?: (tag: string) => void;
@@ -55,6 +57,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
   availableTags,
   onSelectBook,
   onManageTags,
+  onOpenColorSettings,
+  onUpdateChapter,
   onCreateTag,
   onRenameTag,
   onDeleteTag,
@@ -696,6 +700,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                               fixedHeight
                               onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                               onManageTags={onManageTags}
+                              onOpenColorSettings={onOpenColorSettings}
+                              onUpdateChapter={onUpdateChapter}
                               onToggleStar={onToggleStar}
                               onUpdateCustomNote={onUpdateCustomNote}
                               onAddTag={onAddTag}
@@ -737,6 +743,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                         fixedHeight
                         onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                         onManageTags={onManageTags}
+                        onOpenColorSettings={onOpenColorSettings}
+                        onUpdateChapter={onUpdateChapter}
                         onToggleStar={onToggleStar}
                         onUpdateCustomNote={onUpdateCustomNote}
                         onAddTag={onAddTag}
@@ -795,6 +803,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                         fixedHeight
                         onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                         onManageTags={onManageTags}
+                        onOpenColorSettings={onOpenColorSettings}
+                        onUpdateChapter={onUpdateChapter}
                         onToggleStar={onToggleStar}
                         onUpdateCustomNote={onUpdateCustomNote}
                         onAddTag={onAddTag}
@@ -846,6 +856,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                     fixedHeight
                     onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                     onManageTags={onManageTags}
+                    onOpenColorSettings={onOpenColorSettings}
+                    onUpdateChapter={onUpdateChapter}
                     onToggleStar={onToggleStar}
                     onUpdateCustomNote={onUpdateCustomNote}
                     onAddTag={onAddTag}
@@ -948,6 +960,8 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                       allAnnotations={annotations}
                       onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                       onManageTags={onManageTags}
+                      onOpenColorSettings={onOpenColorSettings}
+                      onUpdateChapter={onUpdateChapter}
                       onToggleStar={onToggleStar}
                       onUpdateCustomNote={onUpdateCustomNote}
                       onAddTag={onAddTag}

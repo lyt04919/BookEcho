@@ -28,11 +28,29 @@ describe('UserVaultDb & Secondary Annotations', () => {
     expect(yellow?.hexColor).toBe('#F5A623');
   });
 
-  it('should update color semantic label', () => {
+  it('should update color semantic label and optional hex color', () => {
     vault.updateColorSemantic('yellow', '核心命题');
-    const semantics = vault.getColorSemantics();
-    const yellow = semantics.find(s => s.colorKey === 'yellow');
+    let semantics = vault.getColorSemantics();
+    let yellow = semantics.find(s => s.colorKey === 'yellow');
     expect(yellow?.label).toBe('核心命题');
+    expect(yellow?.hexColor).toBe('#F5A623');
+
+    vault.updateColorSemantic('green', '方法拆解', '#2E7D32');
+    semantics = vault.getColorSemantics();
+    const green = semantics.find(s => s.colorKey === 'green');
+    expect(green?.label).toBe('方法拆解');
+    expect(green?.hexColor).toBe('#2E7D32');
+
+    // Empty label should be ignored cleanly
+    vault.updateColorSemantic('yellow', '   ');
+    yellow = vault.getColorSemantics().find(s => s.colorKey === 'yellow');
+    expect(yellow?.label).toBe('核心命题');
+  });
+
+  it('should persist manually edited resolvedChapter on annotation meta', () => {
+    vault.updateAnnotationMeta('anno-chap', { resolvedChapter: '第三章 复利效应' });
+    const meta = vault.getAnnotationMeta('anno-chap');
+    expect(meta?.resolvedChapter).toBe('第三章 复利效应');
   });
 
   it('should manage custom notes, starred status, and tags', () => {

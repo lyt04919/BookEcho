@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Search,
   X,
-  BookOpen
+  BookOpen,
+  Palette
 } from 'lucide-react';
 
 export interface BookDetailViewProps {
@@ -42,6 +43,9 @@ export interface BookDetailViewProps {
   onManageTags?: () => void;
   allAnnotations?: AnnotationItem[];
   onOpenInGraph?: (annotation: AnnotationItem) => void;
+  onOpenColorSettings?: () => void;
+  onUpdateChapter?: (uuid: string, chapterTitle: string) => void;
+  chapterSuggestions?: string[];
 }
 
 export const BookDetailView: React.FC<BookDetailViewProps> = ({
@@ -65,7 +69,10 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
   availableTags = [],
   onManageTags,
   allAnnotations = [],
-  onOpenInGraph
+  onOpenInGraph,
+  onOpenColorSettings,
+  onUpdateChapter,
+  chapterSuggestions = []
 }) => {
   // 单书内专属筛选状态
   const [selectedColor, setSelectedColor] = useState<HighlightColor | null>(null);
@@ -245,6 +252,17 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
               );
             })}
 
+            {onOpenColorSettings && (
+              <button
+                onClick={onOpenColorSettings}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta hover:bg-paper-drawer dark:hover:bg-night-drawer transition-colors"
+                title="自定义高亮颜色代表的含义与配色"
+              >
+                <Palette className="w-3.5 h-3.5" />
+                <span>编辑语义</span>
+              </button>
+            )}
+
             {/* 仅看批注 */}
             {notesCount > 0 && (
               <button
@@ -412,8 +430,11 @@ export const BookDetailView: React.FC<BookDetailViewProps> = ({
                     colorSemantics={colorSemantics}
                     availableTags={availableTags}
                     allAnnotations={allAnnotations}
+                    chapterSuggestions={chapterSuggestions}
                     onOpenInGraph={onOpenInGraph}
                     onManageTags={onManageTags}
+                    onOpenColorSettings={onOpenColorSettings}
+                    onUpdateChapter={onUpdateChapter}
                     onToggleStar={onToggleStar}
                     onUpdateCustomNote={onUpdateCustomNote}
                     onAddTag={onAddTag}

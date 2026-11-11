@@ -281,5 +281,13 @@ describe('BookDetailView Component', () => {
     expect(html).toContain('收起原文');
     expect(html).toContain('阅读本章原文');
   });
+
+  it('should render "编辑语义" quick trigger button when onOpenColorSettings is provided', () => {
+    const props = createDefaultProps({
+      onOpenColorSettings: vi.fn()
+    });
+    const html = renderToStaticMarkup(<BookDetailView {...props} />);
+    expect(html).toContain('编辑语义');
+  });
 });
 

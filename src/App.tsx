@@ -18,6 +18,7 @@ import { HighlightCard } from './components/HighlightCard';
 import { InsightsView } from './components/InsightsView';
 import { GlobalSearchView } from './components/GlobalSearchView';
 import { KnowledgeGraphView } from './components/KnowledgeGraphView';
+import { ColorSemanticsModal } from './components/ColorSemanticsModal';
 import { DEMO_BOOKS, DEMO_TAGS, DEMO_ANNOTATIONS } from './data/mockTestData';
 import { MessageSquareQuote, Download, Sparkles, X } from 'lucide-react';
 
@@ -56,6 +57,7 @@ export default function App() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoTags, setDemoTags] = useState<string[]>(DEMO_TAGS);
   const [demoAnnotations, setDemoAnnotations] = useState<AnnotationItem[]>(DEMO_ANNOTATIONS);
+  const [isColorSettingsOpen, setIsColorSettingsOpen] = useState(false);
 
   // 活跃数据（支持在真实库与示例测试数据间平滑切换）
   const activeBooks = isDemoMode ? DEMO_BOOKS : books;
@@ -290,6 +292,54 @@ export default function App() {
     }
   };
 
+  // 更新或修正单条划线的所属章节名称
+  const handleUpdateChapter = async (uuid: string, chapterTitle: string) => {
+    const clean = chapterTitle.trim();
+    if (!clean) return;
+    setCurrentAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, chapterTitle: clean } : a))
+    );
+    setSearchResults(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, chapterTitle: clean } : a))
+    );
+    if (isDemoMode) {
+      setDemoAnnotations(prev =>
+        prev.map(a => (a.uuid === uuid ? { ...a, chapterTitle: clean } : a))
+      );
+      return;
+    }
+    setAllAnnotations(prev =>
+      prev.map(a => (a.uuid === uuid ? { ...a, chapterTitle: clean } : a))
+    );
+    if (typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await window.bookEchoAPI.updateAnnotationMeta(uuid, { resolvedChapter: clean });
+        if (selectedBook) {
+          const chs = await window.bookEchoAPI.getBookChapters(selectedBook.assetId);
+          setBookChapters(chs || []);
+        }
+      } catch (err) {
+        console.error('Failed to update chapter', err);
+      }
+    }
+  };
+
+  // 保存自定义高亮颜色语义与色彩
+  const handleSaveColorSemantics = async (updated: ColorSemanticConfig[]) => {
+    setColorSemantics(updated);
+    if (!isDemoMode && typeof window !== 'undefined' && window.bookEchoAPI) {
+      try {
+        await Promise.all(
+          updated.map(item =>
+            window.bookEchoAPI.updateColorSemantic(item.colorKey, item.label, item.hexColor)
+          )
+        );
+      } catch (err) {
+        console.error('Failed to save color semantics', err);
+      }
+    }
+  };
+
   // 标签增删
   const handleAddTag = async (uuid: string, tag: string) => {
     setCurrentAnnotations(prev =>
@@ -491,6 +541,9 @@ export default function App() {
         .filter(Boolean)
     )
   );
+  const activeBookChapterNames = (bookChapters.length > 0 ? bookChapters : currentBookChapters).map(c =>
+    typeof c === 'string' ? c : c.title
+  );
 
   const handleSelectChapter = (chapter: string) => {
     setActiveChapter(chapter);
@@ -578,6 +631,7 @@ export default function App() {
           setActiveChapter(null);
           setReadingChapterContent(null);
         }}
+        onOpenColorSettings={() => setIsColorSettingsOpen(true)}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -625,6 +679,8 @@ export default function App() {
               setSelectedBook(null);
               setCurrentTab('graph');
             }}
+            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onUpdateChapter={handleUpdateChapter}
             onCreateTag={handleCreateGlobalTag}
             onRenameTag={handleRenameGlobalTag}
             onDeleteTag={handleDeleteGlobalTag}
@@ -643,6 +699,7 @@ export default function App() {
             annotations={activeAnnotations}
             colorSemantics={colorSemantics}
             onSelectBook={handleSelectBook}
+            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
           />
         ) : currentTab === 'search' ? (
           <GlobalSearchView
@@ -658,6 +715,8 @@ export default function App() {
               setSelectedBook(null);
               setCurrentTab('graph');
             }}
+            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onUpdateChapter={handleUpdateChapter}
             onToggleStar={handleToggleStar}
             onUpdateCustomNote={handleUpdateCustomNote}
             onAddTag={handleAddTag}
@@ -728,6 +787,8 @@ export default function App() {
                         setSelectedBook(null);
                         setCurrentTab('graph');
                       }}
+                      onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+                      onUpdateChapter={handleUpdateChapter}
                       onToggleStar={handleToggleStar}
                       onUpdateCustomNote={handleUpdateCustomNote}
                       onAddTag={handleAddTag}
@@ -747,11 +808,14 @@ export default function App() {
             colorSemantics={colorSemantics}
             availableTags={activeTags}
             allAnnotations={activeAnnotations}
+            chapterSuggestions={activeBookChapterNames}
             onOpenInGraph={handleOpenInGraph}
             onManageTags={() => {
               setSelectedBook(null);
               setCurrentTab('graph');
             }}
+            onOpenColorSettings={() => setIsColorSettingsOpen(true)}
+            onUpdateChapter={handleUpdateChapter}
             onBack={() => {
               setSelectedBook(null);
               setBookChapters([]);
@@ -845,6 +909,16 @@ export default function App() {
               setExportBookAssetId(null);
             }
           }}
+        />
+      )}
+
+      {/* 高亮颜色语义与配色自定义弹窗 */}
+      {isColorSettingsOpen && (
+        <ColorSemanticsModal
+          colorSemantics={colorSemantics}
+          annotations={activeAnnotations}
+          onSave={handleSaveColorSemantics}
+          onClose={() => setIsColorSettingsOpen(false)}
         />
       )}
     </div>

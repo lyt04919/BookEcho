@@ -232,4 +232,10 @@ describe('QuoteCardModal Component', () => {
       }
     }
   });
+
+  it('should render text editing toggle button "微调文案" for card customization', () => {
+    const props = createDefaultProps();
+    const html = renderToStaticMarkup(<QuoteCardModal {...props} />);
+    expect(html).toContain('微调文案');
+  });
 });

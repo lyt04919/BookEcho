@@ -13,7 +13,8 @@ import {
   FileText,
   Calendar,
   Award,
-  Palette
+  Palette,
+  Edit2
 } from 'lucide-react';
 
 export interface InsightsViewProps {
@@ -21,6 +22,7 @@ export interface InsightsViewProps {
   annotations: AnnotationItem[];
   colorSemantics: ColorSemanticConfig[];
   onSelectBook: (book: BookItem) => void;
+  onOpenColorSettings?: () => void;
 }
 
 function toDateKey(ms: number): string {
@@ -37,7 +39,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   books,
   annotations,
   colorSemantics,
-  onSelectBook
+  onSelectBook,
+  onOpenColorSettings
 }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -320,11 +323,23 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 
         {/* 右栏：6 种色彩语义占比 */}
         <div className="p-6 rounded-2xl bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border shadow-2xs">
-          <div className="flex items-center gap-2 mb-5">
-            <Palette className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta" />
-            <h3 className="font-serif text-base font-bold text-paper-text dark:text-night-text">
-              高亮色彩语义分布
-            </h3>
+          <div className="flex items-center justify-between gap-2 mb-5">
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta" />
+              <h3 className="font-serif text-base font-bold text-paper-text dark:text-night-text">
+                高亮色彩语义分布
+              </h3>
+            </div>
+            {onOpenColorSettings && (
+              <button
+                onClick={onOpenColorSettings}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta hover:bg-paper-drawer dark:hover:bg-night-drawer transition-colors"
+                title="编辑各高亮颜色代表的语义名称与色彩"
+              >
+                <Edit2 className="w-3 h-3" />
+                <span>自定义语义</span>
+              </button>
+            )}
           </div>
 
           {/* 堆叠比例条 */}

@@ -88,10 +88,18 @@ export class UserVaultDb {
     return rows;
   }
 
-  public updateColorSemantic(colorKey: HighlightColor, label: string): void {
-    this.db.prepare(`
-      UPDATE color_semantics SET label = ? WHERE color_key = ?
-    `).run(label, colorKey);
+  public updateColorSemantic(colorKey: HighlightColor, label: string, hexColor?: string): void {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) return;
+    if (hexColor && /^#[0-9A-Fa-f]{6}$/.test(hexColor.trim())) {
+      this.db.prepare(`
+        UPDATE color_semantics SET label = ?, hex_color = ? WHERE color_key = ?
+      `).run(cleanLabel, hexColor.trim(), colorKey);
+    } else {
+      this.db.prepare(`
+        UPDATE color_semantics SET label = ? WHERE color_key = ?
+      `).run(cleanLabel, colorKey);
+    }
   }
 
   public getAnnotationMeta(uuid: string): AnnotationMetaRecord | null {

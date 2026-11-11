@@ -11,7 +11,7 @@ const api: BookEchoAPI = {
   getHighlightContext: (assetId: string, locationCfi: string, selectedText: string) =>
     ipcRenderer.invoke('context:get', assetId, locationCfi, selectedText),
 
-  updateAnnotationMeta: (uuid: string, updates: { customNote?: string; isStarred?: boolean }) =>
+  updateAnnotationMeta: (uuid: string, updates: { customNote?: string; isStarred?: boolean; resolvedChapter?: string }) =>
     ipcRenderer.invoke('meta:update', uuid, updates),
   addTag: (uuid: string, tag: string) => ipcRenderer.invoke('tag:add', uuid, tag),
   removeTag: (uuid: string, tag: string) => ipcRenderer.invoke('tag:remove', uuid, tag),
@@ -25,8 +25,8 @@ const api: BookEchoAPI = {
     ipcRenderer.invoke('review:submit', uuid, result),
 
   getColorSemantics: () => ipcRenderer.invoke('semantics:get'),
-  updateColorSemantic: (colorKey: HighlightColor, label: string) =>
-    ipcRenderer.invoke('semantics:update', colorKey, label),
+  updateColorSemantic: (colorKey: HighlightColor, label: string, hexColor?: string) =>
+    ipcRenderer.invoke('semantics:update', colorKey, label, hexColor),
   openInAppleBooks: (assetId: string, epubPath?: string | null) =>
     ipcRenderer.invoke('system:openAppleBooks', assetId, epubPath),
   openSystemPrivacySettings: () => ipcRenderer.invoke('system:openSystemPrivacy'),

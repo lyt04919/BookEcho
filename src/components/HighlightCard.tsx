@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnnotationItem, ColorSemanticConfig, HighlightContextResult } from '../../electron/types/ipc';
-import { Star, MessageSquare, Image, Tag, Plus, Check, Copy, Waypoints, ArrowUpRight, X, BookOpen, Quote } from 'lucide-react';
+import { Star, MessageSquare, Image, Tag, Plus, Check, Copy, Waypoints, ArrowUpRight, X, BookOpen, Quote, Edit2 } from 'lucide-react';
 
 /**
  * 在核心段落文本中定位高亮选区范围，用于二次强调渲染
@@ -96,8 +96,12 @@ export interface HighlightCardProps {
   allAnnotations?: AnnotationItem[];
   /** 是否强制卡片统一固定高度（用于多列知识网络网格对齐，书本精读等单列场景默认为自适应高度） */
   fixedHeight?: boolean;
+  /** 本书已有章节建议列表（供单条笔记手动纠正所属章节时下拉提示） */
+  chapterSuggestions?: string[];
   onOpenInGraph?: (annotation: AnnotationItem) => void;
   onManageTags?: () => void;
+  onOpenColorSettings?: () => void;
+  onUpdateChapter?: (uuid: string, chapterTitle: string) => void;
   onToggleStar: (uuid: string) => void;
   onUpdateCustomNote: (uuid: string, note: string) => void;
   onAddTag: (uuid: string, tag: string) => void;
@@ -112,8 +116,11 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   availableTags = [],
   allAnnotations = [],
   fixedHeight = false,
+  chapterSuggestions = [],
   onOpenInGraph,
   onManageTags,
+  onOpenColorSettings,
+  onUpdateChapter,
   onToggleStar,
   onUpdateCustomNote,
   onAddTag,
@@ -123,6 +130,8 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
 }) => {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(annotation.customNote || '');
+  const [isEditingChapter, setIsEditingChapter] = useState(false);
+  const [chapterInput, setChapterInput] = useState(annotation.chapterTitle || '');
   const [isTagSelectorOpen, setIsTagSelectorOpen] = useState(false);
   const [isContextModalOpen, setIsContextModalOpen] = useState(false);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
@@ -245,6 +254,14 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
     setIsEditingNote(false);
   };
 
+  const handleSaveChapter = () => {
+    const clean = chapterInput.trim();
+    if (clean && onUpdateChapter) {
+      onUpdateChapter(annotation.uuid, clean);
+    }
+    setIsEditingChapter(false);
+  };
+
   // 居中原文语境弹窗组件内容
   const contextModalContent = isContextModalOpen && (
     <div
@@ -263,30 +280,89 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
 
         {/* 弹窗头部 */}
         <div className="px-5 py-4 border-b border-paper-border/70 dark:border-night-border/70 flex items-center justify-between gap-3 bg-paper-sidebar/40 dark:bg-night-sidebar/40">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <BookOpen className="w-4 h-4 text-paper-terracotta dark:text-night-terracotta flex-shrink-0" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h3
                 id={`context-modal-title-${annotation.uuid}`}
                 className="font-serif font-bold text-sm sm:text-base text-paper-text dark:text-night-text truncate"
               >
                 《{annotation.bookTitle || '书籍原文语境'}》
               </h3>
-              <p className="text-xs text-paper-muted dark:text-night-muted truncate">
-                {annotation.chapterTitle && annotation.chapterTitle !== '默认章节'
-                  ? annotation.chapterTitle
-                  : '原文上下文全览'}
-              </p>
+
+              {isEditingChapter && onUpdateChapter ? (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <input
+                    type="text"
+                    value={chapterInput}
+                    onChange={e => setChapterInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveChapter();
+                      if (e.key === 'Escape') setIsEditingChapter(false);
+                    }}
+                    list={`chapter-list-${annotation.uuid}`}
+                    placeholder="输入或选择所属章节..."
+                    className="px-2 py-0.5 text-xs rounded border border-paper-terracotta bg-paper-card dark:bg-night-card text-paper-text dark:text-night-text focus:outline-none w-52"
+                    autoFocus
+                  />
+                  {chapterSuggestions.length > 0 && (
+                    <datalist id={`chapter-list-${annotation.uuid}`}>
+                      {chapterSuggestions.map(ch => (
+                        <option key={ch} value={ch} />
+                      ))}
+                    </datalist>
+                  )}
+                  <button
+                    onClick={handleSaveChapter}
+                    className="p-0.5 text-emerald-600 hover:bg-emerald-500/10 rounded"
+                    title="保存章节"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setIsEditingChapter(false)}
+                    className="p-0.5 text-paper-muted hover:text-paper-text rounded"
+                    title="取消"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-paper-muted dark:text-night-muted">
+                  <span className="truncate">
+                    {annotation.chapterTitle || '默认章节'}
+                  </span>
+                  {onUpdateChapter && (
+                    <button
+                      onClick={() => {
+                        setChapterInput(annotation.chapterTitle || '');
+                        setIsEditingChapter(true);
+                      }}
+                      className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 hover:text-paper-terracotta transition-colors flex-shrink-0"
+                      title="修改/归类所属章节"
+                      aria-label="修改所属章节"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span
-              className="px-2 py-0.5 rounded text-[11px] font-medium"
+            <button
+              type="button"
+              onClick={onOpenColorSettings}
+              disabled={!onOpenColorSettings}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-opacity ${
+                onOpenColorSettings ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+              }`}
               style={{ backgroundColor: `${colorHex}20`, color: colorHex }}
+              title={onOpenColorSettings ? '点击自定义该颜色的语义名称与配色' : undefined}
             >
               {semantic?.label || '高亮'}
-            </span>
+            </button>
             <button
               onClick={() => setIsContextModalOpen(false)}
               className="p-1.5 rounded-lg text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
@@ -503,12 +579,24 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
         {/* 顶部工具栏：语义胶囊与操作按钮 */}
         <div className={`flex items-center justify-between pl-2 ${fixedHeight ? 'flex-shrink-0' : 'mb-3'}`}>
           <div className="flex items-center gap-2">
-            <span
-              className="px-2 py-0.5 rounded text-[11px] font-medium"
-              style={{ backgroundColor: `${colorHex}20`, color: colorHex }}
-            >
-              {semantic?.label || '高亮'}
-            </span>
+            {onOpenColorSettings ? (
+              <button
+                type="button"
+                onClick={onOpenColorSettings}
+                className="px-2 py-0.5 rounded text-[11px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                style={{ backgroundColor: `${colorHex}20`, color: colorHex }}
+                title="点击自定义此颜色代表的含义与配色"
+              >
+                {semantic?.label || '高亮'}
+              </button>
+            ) : (
+              <span
+                className="px-2 py-0.5 rounded text-[11px] font-medium"
+                style={{ backgroundColor: `${colorHex}20`, color: colorHex }}
+              >
+                {semantic?.label || '高亮'}
+              </span>
+            )}
             <span className="text-[11px] text-paper-muted dark:text-night-muted">
               {new Date(annotation.creationDateMs).toLocaleDateString('zh-CN')}
             </span>
