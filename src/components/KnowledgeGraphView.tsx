@@ -693,6 +693,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                               colorSemantics={colorSemantics}
                               availableTags={availableTags}
                               allAnnotations={annotations}
+                              fixedHeight
                               onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                               onManageTags={onManageTags}
                               onToggleStar={onToggleStar}
@@ -733,6 +734,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                         colorSemantics={colorSemantics}
                         availableTags={availableTags}
                         allAnnotations={annotations}
+                        fixedHeight
                         onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                         onManageTags={onManageTags}
                         onToggleStar={onToggleStar}
@@ -790,6 +792,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                         colorSemantics={colorSemantics}
                         availableTags={availableTags}
                         allAnnotations={annotations}
+                        fixedHeight
                         onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                         onManageTags={onManageTags}
                         onToggleStar={onToggleStar}
@@ -840,6 +843,7 @@ export const KnowledgeGraphView: React.FC<KnowledgeGraphViewProps> = ({
                     colorSemantics={colorSemantics}
                     availableTags={availableTags}
                     allAnnotations={annotations}
+                    fixedHeight
                     onOpenInGraph={anno => setFocusedNodeId(`anno:${anno.uuid}`)}
                     onManageTags={onManageTags}
                     onToggleStar={onToggleStar}

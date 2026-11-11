@@ -154,11 +154,17 @@ describe('HighlightCard Component', () => {
     expect(html).toContain('aria-label="生成金句卡片"');
   });
 
-  it('should render standardized card height and flex layout for uniform grid cards', () => {
-    const props = createDefaultProps();
-    const html = renderToStaticMarkup(<HighlightCard {...props} />);
-    expect(html).toContain('h-[264px]');
-    expect(html).toContain('flex flex-col justify-between');
+  it('should render adaptive height by default (book detail view) and fixed height when fixedHeight=true (knowledge graph)', () => {
+    const adaptiveProps = createDefaultProps();
+    const adaptiveHtml = renderToStaticMarkup(<HighlightCard {...adaptiveProps} />);
+    expect(adaptiveHtml).not.toContain('h-[264px]');
+    expect(adaptiveHtml).not.toContain('line-clamp-4');
+
+    const fixedProps = createDefaultProps({ fixedHeight: true });
+    const fixedHtml = renderToStaticMarkup(<HighlightCard {...fixedProps} />);
+    expect(fixedHtml).toContain('h-[264px]');
+    expect(fixedHtml).toContain('flex flex-col justify-between');
+    expect(fixedHtml).toContain('line-clamp-4');
   });
 
   it('should render view context modal trigger button with accurate label', () => {

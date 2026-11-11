@@ -94,6 +94,8 @@ export interface HighlightCardProps {
   colorSemantics: ColorSemanticConfig[];
   availableTags?: string[];
   allAnnotations?: AnnotationItem[];
+  /** 是否强制卡片统一固定高度（用于多列知识网络网格对齐，书本精读等单列场景默认为自适应高度） */
+  fixedHeight?: boolean;
   onOpenInGraph?: (annotation: AnnotationItem) => void;
   onManageTags?: () => void;
   onToggleStar: (uuid: string) => void;
@@ -109,6 +111,7 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   colorSemantics,
   availableTags = [],
   allAnnotations = [],
+  fixedHeight = false,
   onOpenInGraph,
   onManageTags,
   onToggleStar,
@@ -479,18 +482,26 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
   return (
     <>
       {/* 
-        统一卡片高度 h-[264px]，采用 flex flex-col justify-between 确保所有卡片大小一致
+        双模式卡片：
+        - fixedHeight=true (知识网络多列网格)：统一固定高度 h-[264px]，内部浮层编辑不撑破网格
+        - fixedHeight=false (书本精读/单列阅读流)：自适应文字长度，完整展示全部引文与批注
       */}
-      <div className="h-[264px] bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-xl p-4 sm:p-5 relative overflow-hidden transition-all hover:shadow-md flex flex-col justify-between group">
+      <div
+        className={`bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border rounded-xl relative transition-all group ${
+          fixedHeight
+            ? 'h-[264px] p-4 sm:p-5 overflow-hidden hover:shadow-md flex flex-col justify-between'
+            : 'p-5 hover:shadow-sm'
+        }`}
+      >
         {/* 左侧 4px 语义色标 */}
         <div
-          className="absolute left-0 top-0 bottom-0 w-1"
+          className={`absolute left-0 top-0 bottom-0 w-1 ${!fixedHeight ? 'rounded-l-xl' : ''}`}
           style={{ backgroundColor: colorHex }}
           data-testid="semantic-color-bar"
         />
 
         {/* 顶部工具栏：语义胶囊与操作按钮 */}
-        <div className="flex items-center justify-between pl-2 flex-shrink-0">
+        <div className={`flex items-center justify-between pl-2 ${fixedHeight ? 'flex-shrink-0' : 'mb-3'}`}>
           <div className="flex items-center gap-2">
             <span
               className="px-2 py-0.5 rounded text-[11px] font-medium"
@@ -539,39 +550,74 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           </div>
         </div>
 
-        {/* 卡片正文主体：引文限制 line-clamp-4，保证视觉高度整齐一致 */}
-        <div className="flex-1 min-h-0 flex flex-col justify-between py-2 pl-2">
+        {/* 卡片正文主体 */}
+        <div className={fixedHeight ? 'flex-1 min-h-0 flex flex-col justify-between py-2 pl-2' : 'pl-2'}>
           <blockquote
-            className="font-serif text-[15px] leading-relaxed text-paper-text dark:text-night-text tracking-wide line-clamp-4 select-text"
-            title={annotation.selectedText}
+            className={`font-serif leading-relaxed text-paper-text dark:text-night-text tracking-wide select-text ${
+              fixedHeight ? 'text-[15px] line-clamp-4' : 'text-[16px] mb-3'
+            }`}
+            title={fixedHeight ? annotation.selectedText : undefined}
           >
             “{annotation.selectedText}”
           </blockquote>
 
-          {/* 原生划线想法与二次延伸思考紧凑摘要 */}
-          <div className="mt-1.5 space-y-1">
+          {/* 原生划线想法与二次延伸思考 */}
+          <div className={fixedHeight ? 'mt-1.5 space-y-1' : 'space-y-2.5 mb-3'}>
             {annotation.note && (
               <div
-                className="px-2.5 py-1 rounded-md bg-paper-sidebar/60 dark:bg-night-sidebar/60 border border-paper-border/60 dark:border-night-border/60 text-[11px] text-paper-text/90 dark:text-night-text/90 truncate"
-                title={`原文划线想法：${annotation.note}`}
+                className={`rounded-lg bg-paper-sidebar/60 dark:bg-night-sidebar/60 border border-paper-border/60 dark:border-night-border/60 text-paper-text/90 dark:text-night-text/90 ${
+                  fixedHeight ? 'px-2.5 py-1 text-[11px] truncate' : 'px-3 py-2 text-xs'
+                }`}
+                title={fixedHeight ? `原文划线想法：${annotation.note}` : undefined}
               >
-                <span className="font-semibold text-paper-muted dark:text-night-muted mr-1">原文划线想法：</span>
+                <span className="font-semibold text-paper-muted dark:text-night-muted mr-1.5">原文划线想法：</span>
                 {annotation.note}
               </div>
             )}
 
-            {annotation.customNote ? (
+            {!fixedHeight && isEditingNote ? (
+              <div className="space-y-2">
+                <textarea
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  placeholder="记录你的二次联想与思考..."
+                  className="w-full text-xs p-2.5 rounded-lg border border-paper-border dark:border-night-border bg-paper-drawer dark:bg-night-drawer text-paper-text dark:text-night-text focus:outline-none focus:ring-1 focus:ring-paper-terracotta dark:focus:ring-night-terracotta resize-none h-20"
+                  aria-label="二次联想与思考"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={handleCancelNote}
+                    className="px-2.5 py-1 text-xs text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSaveNote}
+                    className="px-3 py-1 text-xs bg-paper-terracotta dark:bg-night-terracotta text-white rounded font-medium hover:opacity-90 transition-opacity"
+                  >
+                    保存思考
+                  </button>
+                </div>
+              </div>
+            ) : annotation.customNote ? (
               <div
                 onClick={handleStartEditNote}
-                className="cursor-pointer group/note flex items-center gap-1.5 text-[11px] text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text truncate"
+                className={`cursor-pointer group/note flex items-start gap-1.5 text-paper-muted dark:text-night-muted hover:text-paper-text dark:hover:text-night-text ${
+                  fixedHeight ? 'text-[11px] items-center truncate' : 'text-xs'
+                }`}
                 role="button"
                 tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleStartEditNote(); }}
                 aria-label="编辑深度想法"
-                title={`二次思考：${annotation.customNote}`}
+                title={fixedHeight ? `二次思考：${annotation.customNote}` : undefined}
               >
-                <MessageSquare className="w-3 h-3 text-paper-terracotta dark:text-night-terracotta flex-shrink-0" />
-                <span className="truncate">{annotation.customNote}</span>
+                <MessageSquare
+                  className={`text-paper-terracotta dark:text-night-terracotta flex-shrink-0 ${
+                    fixedHeight ? 'w-3 h-3' : 'w-3.5 h-3.5 mt-0.5'
+                  }`}
+                />
+                <span className={fixedHeight ? 'truncate' : ''}>{annotation.customNote}</span>
               </div>
             ) : (
               <button
@@ -586,16 +632,28 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
         </div>
 
         {/* 底部工具条：标签点选与居中原文弹窗入口 */}
-        <div className="pl-2 pt-2 border-t border-paper-border/40 dark:border-night-border/40 flex items-center justify-between gap-1 flex-shrink-0">
+        <div
+          className={`pl-2 pt-2 border-t border-paper-border/40 dark:border-night-border/40 flex items-center justify-between gap-1 ${
+            fixedHeight ? 'flex-shrink-0' : 'flex-wrap gap-y-2'
+          }`}
+        >
           {/* 标签胶囊区 */}
-          <div className="flex items-center gap-1 overflow-hidden flex-1 min-w-0 pr-1">
+          <div
+            className={`flex items-center gap-1.5 ${
+              fixedHeight ? 'overflow-hidden flex-1 min-w-0 pr-1' : 'flex-wrap'
+            }`}
+          >
             {(annotation.tags || []).map(t => (
               <span
                 key={t}
-                className="group/tag inline-flex items-center gap-0.5 bg-paper-drawer dark:bg-night-drawer px-1.5 py-0.5 rounded text-[10px] text-paper-muted dark:text-night-muted border border-paper-border/40 dark:border-night-border/40 flex-shrink-0 max-w-[90px] truncate"
+                className={`group/tag inline-flex items-center gap-1 bg-paper-drawer dark:bg-night-drawer rounded text-paper-muted dark:text-night-muted border border-paper-border/40 dark:border-night-border/40 ${
+                  fixedHeight
+                    ? 'px-1.5 py-0.5 text-[10px] flex-shrink-0 max-w-[90px] truncate'
+                    : 'px-2 py-0.5 text-[11px]'
+                }`}
               >
                 <Tag className="w-2.5 h-2.5 flex-shrink-0" />
-                <span className="truncate">#{t}</span>
+                <span className={fixedHeight ? 'truncate' : ''}>#{t}</span>
                 <button
                   onClick={() => onRemoveTag(annotation.uuid, t)}
                   className="hidden group-hover/tag:inline hover:text-red-500 ml-0.5 transition-colors"
@@ -610,7 +668,9 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
             {/* 标签管理点选按钮 */}
             <button
               onClick={() => setIsTagSelectorOpen(prev => !prev)}
-              className={`text-[10.5px] px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors flex-shrink-0 ${
+              className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors flex-shrink-0 ${
+                fixedHeight ? 'text-[10.5px]' : 'text-[11px]'
+              } ${
                 isTagSelectorOpen
                   ? 'bg-paper-terracotta dark:bg-night-terracotta text-white font-medium'
                   : 'bg-paper-drawer/70 dark:bg-night-drawer/70 text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta'
@@ -624,7 +684,7 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           {/* 右侧：弹出居中原文语境窗口按钮 */}
           <button
             onClick={handleOpenContextModal}
-            className="flex-shrink-0 flex items-center gap-1 text-[11px] text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors py-0.5"
+            className="flex-shrink-0 flex items-center gap-1 text-[11px] text-paper-muted dark:text-night-muted hover:text-paper-terracotta dark:hover:text-night-terracotta transition-colors py-0.5 ml-auto"
             title="打开居中窗口查看原文语境"
           >
             <BookOpen className="w-3 h-3 text-paper-terracotta/80" />
@@ -633,8 +693,8 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           </button>
         </div>
 
-        {/* 内部浮层：思考编辑浮层（就地浮层，不改变卡片高度） */}
-        {isEditingNote && (
+        {/* 内部浮层：固定高度模式下的思考编辑浮层（不改变卡片高度） */}
+        {fixedHeight && isEditingNote && (
           <div className="absolute inset-0 z-20 bg-paper-card dark:bg-night-card p-4 flex flex-col justify-between animate-in fade-in duration-100">
             <div className="space-y-1.5 flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between text-xs font-medium text-paper-muted dark:text-night-muted">
@@ -669,17 +729,30 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
           </div>
         )}
 
-        {/* 内部浮层：标签点选浮层 */}
+        {/* 标签点选面板（fixedHeight 下作为内部浮层展示，自适应模式下在底部自然展开） */}
         {isTagSelectorOpen && (
-          <div className="absolute inset-x-3 bottom-12 z-20 p-2.5 rounded-xl bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border shadow-lg flex flex-wrap items-center gap-1.5 text-xs max-h-36 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-100">
-            <div className="w-full flex items-center justify-between pb-1 border-b border-paper-border/40 text-[10.5px] text-paper-muted">
-              <span>点选添加标签：</span>
-              <button onClick={() => setIsTagSelectorOpen(false)} className="hover:text-paper-text">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
+          <div
+            className={
+              fixedHeight
+                ? 'absolute inset-x-3 bottom-12 z-20 p-2.5 rounded-xl bg-paper-card dark:bg-night-card border border-paper-border dark:border-night-border shadow-lg flex flex-wrap items-center gap-1.5 text-xs max-h-36 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-100'
+                : 'ml-2 mt-2.5 p-2.5 rounded-lg bg-paper-drawer/80 dark:bg-night-drawer/80 border border-paper-border/60 dark:border-night-border/60 flex flex-wrap items-center gap-1.5 text-xs'
+            }
+          >
+            {fixedHeight && (
+              <div className="w-full flex items-center justify-between pb-1 border-b border-paper-border/40 text-[10.5px] text-paper-muted">
+                <span>点选添加标签：</span>
+                <button onClick={() => setIsTagSelectorOpen(false)} className="hover:text-paper-text">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
             {availableTags.length > 0 ? (
               <>
+                {!fixedHeight && (
+                  <span className="text-[11px] text-paper-muted dark:text-night-muted mr-1">
+                    点选标签：
+                  </span>
+                )}
                 {availableTags.map(t => {
                   const isAttached = (annotation.tags || []).includes(t);
                   return (
@@ -712,13 +785,13 @@ export const HighlightCard: React.FC<HighlightCardProps> = ({
               </>
             ) : (
               <div className="w-full flex items-center justify-between text-[11px] text-paper-muted dark:text-night-muted">
-                <span>暂无标签</span>
+                <span>标签库暂无标签，请先在「标签管理」中统一创建</span>
                 {onManageTags && (
                   <button
                     onClick={onManageTags}
                     className="text-paper-terracotta dark:text-night-terracotta font-medium hover:underline"
                   >
-                    新建标签 →
+                    去新建标签 →
                   </button>
                 )}
               </div>
